@@ -36,10 +36,10 @@ export const SparklesCore = ({
     if (!isMounted) return
 
     const handleResize = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
+    setDimensions({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })
     }
     
     // Set initial dimensions

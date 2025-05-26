@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Plus, Settings, Coins, TrendingUp, Shield, Zap } from "lucide-react"
 import { FloatingSolanaFeatures } from "@/components/floating-paper"
 import { WalletStatus } from "@/components/wallet-status"
+import Link from "next/link"
 
 export default function Hero() {
   return (
@@ -45,14 +46,24 @@ export default function Hero() {
               transition={{ duration: 0.5, delay: 0.4 }}
               className="flex flex-col sm:flex-row items-start gap-4"
             >
+              <Link href="/create">
               <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8">
                 <Plus className="mr-2 h-5 w-5" />
                 Create New Token
               </Button>
+              </Link>
+              <Link href="/tokens">
+              <Button size="lg" variant="outline" className="text-white border-purple-500 hover:bg-purple-500/20">
+                <Coins className="mr-2 h-5 w-5" />
+                Token Portfolio
+              </Button>
+              </Link>
+              <Link href="/manage">
               <Button size="lg" variant="outline" className="text-white border-purple-500 hover:bg-purple-500/20">
                 <Settings className="mr-2 h-5 w-5" />
                 Manage Tokens
               </Button>
+              </Link>
             </motion.div>
 
             <motion.div

@@ -6,7 +6,7 @@ export function useMousePosition() {
 
   useEffect(() => {
     setIsMounted(true)
-    
+
     const updateMousePosition = (ev: MouseEvent) => {
       setMousePosition({ x: ev.clientX, y: ev.clientY })
     }
