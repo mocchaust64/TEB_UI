@@ -98,6 +98,11 @@ const isCompatibleExtension = (extensionId: string, selectedExtensions: string[]
   compatible: boolean; 
   incompatibleWith?: string 
 } => {
+  // Kiểm tra nếu đây là extension cần fee receiver
+  if (extensionId === "transfer-fees") {
+    // Logic cũ giữ nguyên
+  }
+
   for (const selectedExt of selectedExtensions) {
     const pair1 = [extensionId, selectedExt] as [string, string];
     const pair2 = [selectedExt, extensionId] as [string, string];
@@ -144,7 +149,15 @@ const tokenExtensions: TokenExtensionType[] = [
     color: "text-green-400",
     bgColor: "bg-green-400/10",
     options: [
-      { id: "fee-percentage", label: "Fee Percentage", type: "slider", min: 0, max: 10, step: 0.1, defaultValue: 1 }
+      { id: "fee-percentage", label: "Fee Percentage", type: "slider", min: 0, max: 10, step: 0.1, defaultValue: 1 },
+      { 
+        id: "fee-receiver", 
+        label: "Fee Receiver Address", 
+        type: "text", 
+        placeholder: "Enter fee receiver public key",
+        required: true,
+        validator: validatePublicKey
+      }
     ]
   },
   {
@@ -354,6 +367,28 @@ export default function CreateToken() {
       // Thêm extension mới vào danh sách
       setSelectedExtensions(prev => [...prev, extensionId]);
       
+      // Thiết lập giá trị mặc định cho các extension
+      if (extensionId === "transfer-fees") {
+        // Tìm extension và thiết lập giá trị mặc định
+        const transferFeeExt = tokenExtensions.find(ext => ext.id === "transfer-fees");
+        if (transferFeeExt) {
+          const feePercentageOption = transferFeeExt.options.find(opt => opt.id === "fee-percentage");
+          if (feePercentageOption && feePercentageOption.type === "slider") {
+            // Thiết lập giá trị mặc định cho fee-percentage
+            setTokenData(prev => ({
+              ...prev,
+              extensionOptions: {
+                ...prev.extensionOptions,
+                "transfer-fees": {
+                  ...(prev.extensionOptions["transfer-fees"] || {}),
+                  "fee-percentage": (feePercentageOption as SliderOptionType).defaultValue
+                }
+              }
+            }));
+          }
+        }
+      }
+      
       // Tự động chọn tab của extension mới thêm
       setActiveTab(extensionId);
     }
@@ -371,6 +406,40 @@ export default function CreateToken() {
         }
       }
     }))
+    
+    // Xử lý đặc biệt cho transfer-fee khi cập nhật fee-percentage
+    if (extensionId === "transfer-fees" && optionId === "fee-percentage") {
+      // Đảm bảo giá trị nằm trong khoảng hợp lệ
+      const feePercentage = parseFloat(value);
+      if (isNaN(feePercentage) || feePercentage < 0) {
+        setValidationErrors(prev => ({
+          ...prev,
+          [extensionId]: {
+            ...(prev[extensionId] || {}),
+            [optionId]: 'Phí chuyển khoản không được nhỏ hơn 0%'
+          }
+        }));
+      } else if (feePercentage > 10) {
+        setValidationErrors(prev => ({
+          ...prev,
+          [extensionId]: {
+            ...(prev[extensionId] || {}),
+            [optionId]: 'Phí chuyển khoản không được lớn hơn 10%'
+          }
+        }));
+      } else {
+        // Xóa lỗi nếu có
+        if (validationErrors[extensionId]?.[optionId]) {
+          setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            if (newErrors[extensionId]) {
+              delete newErrors[extensionId][optionId];
+            }
+            return newErrors;
+          });
+        }
+      }
+    }
     
     // Xóa lỗi nếu có
     if (validationErrors[extensionId]?.[optionId]) {
@@ -498,6 +567,49 @@ export default function CreateToken() {
       const extension = tokenExtensions.find(ext => ext.id === extensionId);
       
       if (extension) {
+        // Kiểm tra đặc biệt cho transfer-fees
+        if (extensionId === "transfer-fees") {
+          // Kiểm tra fee-receiver
+          const feeReceiver = tokenData.extensionOptions[extensionId]?.["fee-receiver"];
+          if (!feeReceiver || (typeof feeReceiver === 'string' && feeReceiver.trim() === '')) {
+            errors[extensionId] = {
+              ...(errors[extensionId] || {}),
+              "fee-receiver": "Địa chỉ nhận phí là bắt buộc"
+            };
+            isValid = false;
+          } else {
+            // Nếu có giá trị, kiểm tra định dạng public key
+            const validation = validatePublicKey(feeReceiver);
+            if (!validation.valid) {
+              errors[extensionId] = {
+                ...(errors[extensionId] || {}),
+                "fee-receiver": validation.message || "Địa chỉ nhận phí không hợp lệ"
+              };
+              isValid = false;
+            }
+          }
+          
+          // Kiểm tra fee-percentage
+          const feePercentage = tokenData.extensionOptions[extensionId]?.["fee-percentage"];
+          if (feePercentage === undefined || feePercentage === null) {
+            errors[extensionId] = {
+              ...(errors[extensionId] || {}),
+              "fee-percentage": "Phần trăm phí là bắt buộc"
+            };
+            isValid = false;
+          } else {
+            const percentValue = Number(feePercentage);
+            if (isNaN(percentValue) || percentValue < 0 || percentValue > 10) {
+              errors[extensionId] = {
+                ...(errors[extensionId] || {}),
+                "fee-percentage": "Phần trăm phí phải từ 0-10%"
+              };
+              isValid = false;
+            }
+          }
+        }
+        
+        // Kiểm tra các option bắt buộc khác
         const requiredOptions = extension.options.filter(
           opt => opt.type === 'text' && (opt as TextOptionType).required
         );
@@ -894,6 +1006,19 @@ export default function CreateToken() {
                                       />
                                     </div>
                                   ))}
+                                  
+                                  {extension.id === "transfer-fees" && (
+                                    <div className="bg-gray-800/50 rounded-lg p-3 text-gray-400 text-xs mt-3">
+                                      <div className="flex items-start">
+                                        <Info className="w-3 h-3 mr-1 mt-0.5 shrink-0" />
+                                        <span>
+                                          Phí chuyển khoản được tính theo phần trăm mỗi khi token được chuyển đi. 
+                                          Khi người dùng thực hiện giao dịch chuyển token, phí sẽ được trừ tự động 
+                                          và gửi đến địa chỉ Fee Receiver được cấu hình.
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
