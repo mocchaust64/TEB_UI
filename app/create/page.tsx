@@ -284,6 +284,13 @@ export default function CreateToken() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, Record<string, string>>>({})
   const [activeTab, setActiveTab] = useState<string>("metadata")
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    symbol?: string;
+    decimals?: string;
+    supply?: string;
+    image?: string;
+  }>({})
   const [tokenData, setTokenData] = useState({
     name: "",
     symbol: "",
@@ -415,10 +422,16 @@ export default function CreateToken() {
         imageUrl: imageUrl
       }));
 
+      // Xóa lỗi ảnh nếu có
+      if (formErrors.image) {
+        setFormErrors({...formErrors, image: undefined});
+      }
+
       toast.success("Image uploaded successfully");
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
+      setFormErrors({...formErrors, image: "Không thể tải lên ảnh, vui lòng thử lại"});
     } finally {
       setUploadingImage(false);
     }
@@ -428,17 +441,57 @@ export default function CreateToken() {
   const validateTokenData = (): boolean => {
     let isValid = true;
     const errors: Record<string, Record<string, string>> = {};
+    const basicErrors: {
+      name?: string;
+      symbol?: string;
+      decimals?: string;
+      supply?: string;
+      image?: string;
+    } = {};
     
     // Kiểm tra các trường cơ bản
     if (!tokenData.name.trim()) {
-      toast.error("Vui lòng nhập tên token");
-      return false;
+      basicErrors.name = "Tên token là bắt buộc";
+      isValid = false;
     }
     
     if (!tokenData.symbol.trim()) {
-      toast.error("Vui lòng nhập ký hiệu token");
-      return false;
+      basicErrors.symbol = "Ký hiệu token là bắt buộc";
+      isValid = false;
+    } else if (tokenData.symbol.length > 10) {
+      basicErrors.symbol = "Ký hiệu token không được vượt quá 10 ký tự";
+      isValid = false;
     }
+    
+    if (!tokenData.decimals) {
+      basicErrors.decimals = "Số thập phân là bắt buộc";
+      isValid = false;
+    } else {
+      const decimalsNum = Number(tokenData.decimals);
+      if (isNaN(decimalsNum) || decimalsNum < 0 || decimalsNum > 9) {
+        basicErrors.decimals = "Số thập phân phải là số từ 0-9";
+        isValid = false;
+      }
+    }
+    
+    if (!tokenData.supply) {
+      basicErrors.supply = "Khối lượng token là bắt buộc";
+      isValid = false;
+    } else {
+      const supplyNum = Number(tokenData.supply);
+      if (isNaN(supplyNum) || supplyNum <= 0) {
+        basicErrors.supply = "Khối lượng token phải lớn hơn 0";
+        isValid = false;
+      }
+    }
+    
+    // Kiểm tra ảnh đã tải lên thành công chưa
+    if (!tokenData.imageUrl) {
+      basicErrors.image = "Bạn phải tải lên ảnh cho token";
+      isValid = false;
+    }
+    
+    setFormErrors(basicErrors);
     
     // Validate thông tin extension
     for (const extensionId of selectedExtensions) {
@@ -482,7 +535,12 @@ export default function CreateToken() {
     setValidationErrors(errors);
     
     if (!isValid) {
-      toast.error("Vui lòng nhập đầy đủ thông tin cho các extension đã chọn");
+      // Hiển thị thông báo lỗi tổng quan
+      if (Object.keys(basicErrors).length > 0) {
+        toast.error("Vui lòng nhập đầy đủ thông tin cơ bản cho token");
+      } else {
+        toast.error("Vui lòng nhập đầy đủ thông tin cho các extension đã chọn");
+      }
     }
     
     return isValid;
@@ -560,44 +618,68 @@ export default function CreateToken() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="token-name" className="text-white">Token Name</Label>
+                      <Label htmlFor="token-name" className="text-white">Token Name<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-name" 
                         placeholder="e.g. My Amazing Token" 
-                        className="bg-gray-800 border-gray-700 text-white"
+                        className={`bg-gray-800 border-gray-700 text-white ${formErrors.name ? 'border-red-500' : ''}`}
                         value={tokenData.name}
-                        onChange={(e) => setTokenData({...tokenData, name: e.target.value})}
+                        onChange={(e) => {
+                          setTokenData({...tokenData, name: e.target.value});
+                          if (formErrors.name) {
+                            setFormErrors({...formErrors, name: undefined});
+                          }
+                        }}
                       />
+                      {formErrors.name && <p className="text-xs text-red-500">{formErrors.name}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-symbol" className="text-white">Token Symbol</Label>
+                      <Label htmlFor="token-symbol" className="text-white">Token Symbol<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-symbol" 
                         placeholder="e.g. MAT" 
-                        className="bg-gray-800 border-gray-700 text-white"
+                        className={`bg-gray-800 border-gray-700 text-white ${formErrors.symbol ? 'border-red-500' : ''}`}
                         value={tokenData.symbol}
-                        onChange={(e) => setTokenData({...tokenData, symbol: e.target.value})}
+                        onChange={(e) => {
+                          setTokenData({...tokenData, symbol: e.target.value});
+                          if (formErrors.symbol) {
+                            setFormErrors({...formErrors, symbol: undefined});
+                          }
+                        }}
                       />
+                      {formErrors.symbol && <p className="text-xs text-red-500">{formErrors.symbol}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-decimals" className="text-white">Decimals</Label>
+                      <Label htmlFor="token-decimals" className="text-white">Decimals<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-decimals" 
                         type="number" 
-                        className="bg-gray-800 border-gray-700 text-white"
+                        className={`bg-gray-800 border-gray-700 text-white ${formErrors.decimals ? 'border-red-500' : ''}`}
                         value={tokenData.decimals}
-                        onChange={(e) => setTokenData({...tokenData, decimals: e.target.value})}
+                        onChange={(e) => {
+                          setTokenData({...tokenData, decimals: e.target.value});
+                          if (formErrors.decimals) {
+                            setFormErrors({...formErrors, decimals: undefined});
+                          }
+                        }}
                       />
+                      {formErrors.decimals && <p className="text-xs text-red-500">{formErrors.decimals}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-supply" className="text-white">Initial Supply</Label>
+                      <Label htmlFor="token-supply" className="text-white">Initial Supply<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-supply" 
                         type="number" 
-                        className="bg-gray-800 border-gray-700 text-white"
+                        className={`bg-gray-800 border-gray-700 text-white ${formErrors.supply ? 'border-red-500' : ''}`}
                         value={tokenData.supply}
-                        onChange={(e) => setTokenData({...tokenData, supply: e.target.value})}
+                        onChange={(e) => {
+                          setTokenData({...tokenData, supply: e.target.value});
+                          if (formErrors.supply) {
+                            setFormErrors({...formErrors, supply: undefined});
+                          }
+                        }}
                       />
+                      {formErrors.supply && <p className="text-xs text-red-500">{formErrors.supply}</p>}
                     </div>
                   </div>
                   
@@ -614,10 +696,10 @@ export default function CreateToken() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="token-image" className="text-white">Token Image</Label>
+                      <Label htmlFor="token-image" className="text-white">Token Image<span className="text-red-500 ml-1">*</span></Label>
                       {tokenData.image ? (
                         <div className="relative flex items-center justify-center">
-                          <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-purple-500/30 flex items-center justify-center bg-gray-800">
+                          <div className={`w-24 h-24 rounded-full overflow-hidden border-2 ${formErrors.image ? 'border-red-500' : 'border-purple-500/30'} flex items-center justify-center bg-gray-800`}>
                             <img 
                               src={tokenData.imageUrl || URL.createObjectURL(tokenData.image)} 
                               alt="Token Preview" 
@@ -628,7 +710,10 @@ export default function CreateToken() {
                             variant="ghost"
                             size="sm"
                             className="absolute top-0 right-0 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-1 h-8 w-8"
-                            onClick={() => setTokenData({...tokenData, image: null, imageUrl: ""})}
+                            onClick={() => {
+                              setTokenData({...tokenData, image: null, imageUrl: ""});
+                              setFormErrors({...formErrors, image: "Bạn phải tải lên ảnh cho token"});
+                            }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
                               <path d="M18 6 6 18"/>
@@ -638,7 +723,7 @@ export default function CreateToken() {
                         </div>
                       ) : (
                         <div 
-                          className="flex items-center justify-center border-2 border-dashed border-gray-700 rounded-full h-24 w-24 mx-auto cursor-pointer hover:border-purple-500/50 transition-colors"
+                          className={`flex items-center justify-center border-2 border-dashed ${formErrors.image ? 'border-red-500' : 'border-gray-700'} rounded-full h-24 w-24 mx-auto cursor-pointer hover:border-purple-500/50 transition-colors`}
                           onClick={() => document.getElementById('token-image')?.click()}
                         >
                           <div className="text-center">
@@ -662,6 +747,7 @@ export default function CreateToken() {
                           />
                         </div>
                       )}
+                      {formErrors.image && <p className="text-xs text-red-500 text-center mt-1">{formErrors.image}</p>}
                       {tokenData.imageUrl && (
                         <p className="text-xs text-green-400 text-center mt-1">
                           Ảnh đã tải lên thành công
