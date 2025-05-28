@@ -19,8 +19,6 @@ import {
   Zap, 
   Shield, 
   FileText, 
-  Users, 
-  ArrowRightLeft,
   Upload,
   Info
 } from "lucide-react"
@@ -31,6 +29,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PageLoadingSkeleton } from "@/components/loading-skeleton"
+import { uploadImageAndGetUrl } from "@/lib/utils/pinata"
+import { toast } from "sonner"
 
 // Định nghĩa các kiểu dữ liệu cho token extensions
 type TextOptionType = {
@@ -38,6 +38,8 @@ type TextOptionType = {
   label: string
   type: "text"
   placeholder: string
+  required?: boolean
+  validator?: (value: string) => { valid: boolean, message?: string }
 }
 
 type SliderOptionType = {
@@ -60,10 +62,80 @@ type TokenExtensionType = {
   color: string
   bgColor: string
   options: OptionType[]
+  isRequired?: boolean
+  disabled?: boolean
+  disabledReason?: string
 }
 
-// Dữ liệu các extensions cho token
+// Function để validate public key
+const validatePublicKey = (value: string): { valid: boolean, message?: string } => {
+  // Kiểm tra xem có phải là public key Solana hợp lệ không (bắt đầu với số hoặc chữ và độ dài 32-44 ký tự)
+  if (!value || value.trim() === '') {
+    return { valid: false, message: "Public key không được để trống" };
+  }
+  
+  // Kiểm tra định dạng base58
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  if (!base58Regex.test(value)) {
+    return { valid: false, message: "Public key không đúng định dạng" };
+  }
+  
+  return { valid: true };
+};
+
+// Định nghĩa các cặp extensions không tương thích
+const incompatibleExtensionPairs: [string, string][] = [
+  ["transfer-fees", "non-transferable"],
+  ["non-transferable", "transfer-hook"],
+  ["confidential-transfer", "transfer-fees"],
+  ["confidential-transfer", "transfer-hook"],
+  ["confidential-transfer", "permanent-delegate"],
+  ["confidential-transfer", "non-transferable"]
+];
+
+// Hàm kiểm tra tính tương thích của một extension với các extensions đã chọn
+const isCompatibleExtension = (extensionId: string, selectedExtensions: string[]): { 
+  compatible: boolean; 
+  incompatibleWith?: string 
+} => {
+  for (const selectedExt of selectedExtensions) {
+    const pair1 = [extensionId, selectedExt] as [string, string];
+    const pair2 = [selectedExt, extensionId] as [string, string];
+    
+    const isIncompatible = incompatibleExtensionPairs.some(
+      pair => (pair[0] === pair1[0] && pair[1] === pair1[1]) || 
+              (pair[0] === pair2[0] && pair[1] === pair2[1])
+    );
+    
+    if (isIncompatible) {
+      return { compatible: false, incompatibleWith: selectedExt };
+    }
+  }
+  
+  return { compatible: true };
+};
+
 const tokenExtensions: TokenExtensionType[] = [
+  {
+    id: "metadata",
+    icon: FileText,
+    name: "Token Metadata",
+    description: "Metadata nhúng trực tiếp vào token (luôn được bật)",
+    color: "text-blue-500",
+    bgColor: "bg-blue-500/10",
+    options: [],
+    isRequired: true
+  },
+  {
+    id: "metadata-pointer",
+    icon: FileText,
+    name: "Metadata Pointer",
+    description: "Liên kết metadata với token (luôn được bật)",
+    color: "text-pink-400",
+    bgColor: "bg-pink-400/10",
+    options: [],
+    isRequired: true
+  },
   {
     id: "transfer-fees",
     icon: Percent,
@@ -82,7 +154,9 @@ const tokenExtensions: TokenExtensionType[] = [
     description: "Secure transaction information with zero-knowledge proofs",
     color: "text-blue-400",
     bgColor: "bg-blue-400/10",
-    options: []
+    options: [],
+    disabled: true,
+    disabledReason: "Đang trong giai đoạn phát triển, chưa sẵn sàng sử dụng"
   },
   {
     id: "permanent-delegate",
@@ -92,7 +166,14 @@ const tokenExtensions: TokenExtensionType[] = [
     color: "text-purple-400",
     bgColor: "bg-purple-400/10",
     options: [
-      { id: "delegate-address", label: "Delegate Address", type: "text", placeholder: "Enter delegate public key" }
+      { 
+        id: "delegate-address", 
+        label: "Delegate Address", 
+        type: "text", 
+        placeholder: "Enter delegate public key",
+        required: true,
+        validator: validatePublicKey
+      }
     ]
   },
   {
@@ -116,65 +197,61 @@ const tokenExtensions: TokenExtensionType[] = [
     ]
   },
   {
-    id: "cpi-guard",
+    id: "default-account-state",
     icon: Shield,
-    name: "CPI Guard",
-    description: "Protection against CPI attacks",
+    name: "Default Account State",
+    description: "Set default state for all accounts of this token",
     color: "text-cyan-400",
     bgColor: "bg-cyan-400/10",
     options: []
   },
   {
-    id: "metadata-pointer",
-    icon: FileText,
-    name: "Metadata Pointer",
-    description: "Link metadata directly to the token",
-    color: "text-pink-400",
-    bgColor: "bg-pink-400/10",
+    id: "mint-close-authority",
+    icon: Key,
+    name: "Mint Close Authority",
+    description: "Authority allowed to close this mint",
+    color: "text-pink-600",
+    bgColor: "bg-pink-600/10",
     options: [
-      { id: "metadata-url", label: "Metadata URL", type: "text", placeholder: "https://example.com/metadata.json" }
+      { 
+        id: "close-authority", 
+        label: "Close Authority Address", 
+        type: "text", 
+        placeholder: "Enter close authority public key",
+        required: true,
+        validator: validatePublicKey
+      }
     ]
-  },
-  {
-    id: "group-pointer",
-    icon: Users,
-    name: "Group Pointer",
-    description: "Group related tokens together",
-    color: "text-indigo-400",
-    bgColor: "bg-indigo-400/10",
-    options: [
-      { id: "group-address", label: "Group Address", type: "text", placeholder: "Enter group public key" }
-    ]
-  },
-  {
-    id: "required-memo",
-    icon: ArrowRightLeft,
-    name: "Required Memo",
-    description: "Require memo for all transactions",
-    color: "text-emerald-400",
-    bgColor: "bg-emerald-400/10",
-    options: []
-  },
+  }
 ]
 
 // Component để hiển thị các tùy chọn của extension
 const ExtensionOptionInput = ({ 
   option, 
   value, 
-  onChange 
+  onChange,
+  error
 }: { 
   option: OptionType; 
   value: string | number | undefined; 
-  onChange: (value: string | number) => void 
+  onChange: (value: string | number) => void;
+  error?: string;
 }) => {
   if (option.type === 'text') {
+    const textOption = option as TextOptionType;
     return (
+      <div className="space-y-1">
       <Input
-        placeholder={(option as TextOptionType).placeholder}
-        className="bg-gray-800 border-gray-700 text-white h-9"
+          placeholder={textOption.placeholder}
+          className={`bg-gray-800 border-gray-700 text-white h-9 ${error ? 'border-red-500' : ''}`}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
       />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        {textOption.required && !error && (
+          <p className="text-xs text-gray-500">* Bắt buộc</p>
+        )}
+      </div>
     );
   }
   
@@ -203,7 +280,10 @@ const ExtensionOptionInput = ({
 // Component chính
 export default function CreateToken() {
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedExtensions, setSelectedExtensions] = useState<string[]>([])
+  const [selectedExtensions, setSelectedExtensions] = useState<string[]>(["metadata", "metadata-pointer"])
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, Record<string, string>>>({})
+  const [activeTab, setActiveTab] = useState<string>("metadata")
   const [tokenData, setTokenData] = useState({
     name: "",
     symbol: "",
@@ -211,6 +291,7 @@ export default function CreateToken() {
     supply: "1000000",
     description: "",
     image: null as File | null,
+    imageUrl: "",
     extensionOptions: {} as Record<string, any>,
     websiteUrl: "",
     twitterUrl: "",
@@ -229,14 +310,50 @@ export default function CreateToken() {
   }, [])
 
   const toggleExtension = (extensionId: string) => {
-    setSelectedExtensions(prev => 
-      prev.includes(extensionId) 
-        ? prev.filter(id => id !== extensionId)
-        : [...prev, extensionId]
-    )
+    // Không cho phép tắt các extension bắt buộc
+    const extension = tokenExtensions.find(ext => ext.id === extensionId);
+    if (extension?.isRequired) {
+      return;
+    }
+    
+    // Không cho phép chọn extension bị vô hiệu hóa
+    if (extension?.disabled) {
+      toast.error(`Không thể sử dụng tính năng ${extension.name}: ${extension.disabledReason}`);
+      return;
+    }
+    
+    if (selectedExtensions.includes(extensionId)) {
+      // Xóa extension khỏi danh sách đã chọn
+      setSelectedExtensions(prev => prev.filter(id => id !== extensionId));
+      
+      // Nếu đang xem tab của extension bị xóa, chuyển về tab đầu tiên còn lại
+      if (activeTab === extensionId) {
+        const remainingExtensions = selectedExtensions.filter(id => id !== extensionId);
+        if (remainingExtensions.length > 0) {
+          setActiveTab(remainingExtensions[0]);
+        } else {
+          setActiveTab("metadata"); // Fallback về metadata
+        }
+      }
+    } else {
+      // Kiểm tra tính tương thích trước khi thêm extension mới
+      const compatibility = isCompatibleExtension(extensionId, selectedExtensions);
+      if (!compatibility.compatible) {
+        const incompatibleExt = tokenExtensions.find(ext => ext.id === compatibility.incompatibleWith);
+        toast.error(`${extension?.name} không tương thích với ${incompatibleExt?.name} đã được chọn`);
+        return;
+      }
+      
+      // Thêm extension mới vào danh sách
+      setSelectedExtensions(prev => [...prev, extensionId]);
+      
+      // Tự động chọn tab của extension mới thêm
+      setActiveTab(extensionId);
+    }
   }
 
   const updateExtensionOption = (extensionId: string, optionId: string, value: any) => {
+    // Cập nhật giá trị
     setTokenData(prev => ({
       ...prev,
       extensionOptions: {
@@ -247,15 +364,138 @@ export default function CreateToken() {
         }
       }
     }))
+    
+    // Xóa lỗi nếu có
+    if (validationErrors[extensionId]?.[optionId]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [extensionId]: {
+          ...(prev[extensionId] || {}),
+          [optionId]: ''
+        }
+      }))
+      
+      // Kiểm tra lại nếu có validator
+      const extension = tokenExtensions.find(ext => ext.id === extensionId);
+      const option = extension?.options.find(opt => opt.id === optionId);
+      
+      if (option && option.type === 'text' && (option as TextOptionType).validator) {
+        const textOption = option as TextOptionType;
+        const validation = textOption.validator!(value);
+        
+        if (!validation.valid) {
+          setValidationErrors(prev => ({
+            ...prev,
+            [extensionId]: {
+              ...(prev[extensionId] || {}),
+              [optionId]: validation.message || 'Giá trị không hợp lệ'
+            }
+          }))
+        }
+      }
+    }
   }
 
+  const handleImageUpload = async (file: File) => {
+    if (!file || !(file instanceof File)) {
+      toast.error("No valid file selected");
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // Tải ảnh lên IPFS sử dụng Pinata
+      const imageUrl = await uploadImageAndGetUrl(file, `token-${tokenData.name.toLowerCase()}`);
+      
+      // Cập nhật state với URL ảnh
+      setTokenData(prev => ({
+        ...prev,
+        image: file,
+        imageUrl: imageUrl
+      }));
+
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Hàm validate dữ liệu token
+  const validateTokenData = (): boolean => {
+    let isValid = true;
+    const errors: Record<string, Record<string, string>> = {};
+    
+    // Kiểm tra các trường cơ bản
+    if (!tokenData.name.trim()) {
+      toast.error("Vui lòng nhập tên token");
+      return false;
+    }
+    
+    if (!tokenData.symbol.trim()) {
+      toast.error("Vui lòng nhập ký hiệu token");
+      return false;
+    }
+    
+    // Validate thông tin extension
+    for (const extensionId of selectedExtensions) {
+      const extension = tokenExtensions.find(ext => ext.id === extensionId);
+      
+      if (extension) {
+        const requiredOptions = extension.options.filter(
+          opt => opt.type === 'text' && (opt as TextOptionType).required
+        );
+        
+        if (requiredOptions.length > 0) {
+          // Kiểm tra từng option bắt buộc
+          for (const option of requiredOptions) {
+            const textOption = option as TextOptionType;
+            const value = tokenData.extensionOptions[extensionId]?.[option.id];
+            
+            // Nếu không có giá trị hoặc giá trị rỗng
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
+              errors[extensionId] = {
+                ...(errors[extensionId] || {}),
+                [option.id]: `Trường ${textOption.label} là bắt buộc`
+              };
+              isValid = false;
+            }
+            // Nếu có validator, thực hiện kiểm tra
+            else if (textOption.validator) {
+              const validation = textOption.validator(value);
+              if (!validation.valid) {
+                errors[extensionId] = {
+                  ...(errors[extensionId] || {}),
+                  [option.id]: validation.message || 'Giá trị không hợp lệ'
+                };
+                isValid = false;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    setValidationErrors(errors);
+    
+    if (!isValid) {
+      toast.error("Vui lòng nhập đầy đủ thông tin cho các extension đã chọn");
+    }
+    
+    return isValid;
+  };
+
   const handleCreateToken = () => {
+    // Validate dữ liệu trước khi tiếp tục
+    if (!validateTokenData()) {
+      return;
+    }
+    
     // Lưu dữ liệu token vào localStorage để trang review có thể truy cập
     if (typeof window !== 'undefined') {
-      if (tokenData.image) {
-        // Có ảnh, chuyển đổi sang base64 trước
-        const reader = new FileReader();
-        reader.onloadend = () => {
           const dataToSave = {
             name: tokenData.name,
             symbol: tokenData.symbol,
@@ -264,26 +504,14 @@ export default function CreateToken() {
             description: tokenData.description,
             extensionOptions: tokenData.extensionOptions,
             selectedExtensions,
-            imageBase64: reader.result
-          };
-          localStorage.setItem('tokenData', JSON.stringify(dataToSave));
-          window.location.href = '/create/review';
-        };
-        reader.readAsDataURL(tokenData.image);
-      } else {
-        // Không có ảnh
-        const dataToSave = {
-          name: tokenData.name,
-          symbol: tokenData.symbol,
-          decimals: tokenData.decimals,
-          supply: tokenData.supply,
-          description: tokenData.description,
-          extensionOptions: tokenData.extensionOptions,
-          selectedExtensions,
+        imageUrl: tokenData.imageUrl,
+        websiteUrl: tokenData.websiteUrl,
+        twitterUrl: tokenData.twitterUrl,
+        telegramUrl: tokenData.telegramUrl,
+        discordUrl: tokenData.discordUrl
         };
         localStorage.setItem('tokenData', JSON.stringify(dataToSave));
         window.location.href = '/create/review';
-      }
     }
   }
 
@@ -391,7 +619,7 @@ export default function CreateToken() {
                         <div className="relative flex items-center justify-center">
                           <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-purple-500/30 flex items-center justify-center bg-gray-800">
                             <img 
-                              src={URL.createObjectURL(tokenData.image)} 
+                              src={tokenData.imageUrl || URL.createObjectURL(tokenData.image)} 
                               alt="Token Preview" 
                               className="h-full w-full object-cover"
                             />
@@ -400,7 +628,7 @@ export default function CreateToken() {
                             variant="ghost"
                             size="sm"
                             className="absolute top-0 right-0 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-1 h-8 w-8"
-                            onClick={() => setTokenData({...tokenData, image: null})}
+                            onClick={() => setTokenData({...tokenData, image: null, imageUrl: ""})}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
                               <path d="M18 6 6 18"/>
@@ -415,7 +643,9 @@ export default function CreateToken() {
                         >
                           <div className="text-center">
                             <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                            <p className="mt-1 text-xs text-gray-400">Tải ảnh</p>
+                            <p className="mt-1 text-xs text-gray-400">
+                              {uploadingImage ? "Đang tải..." : "Tải ảnh"}
+                            </p>
                           </div>
                           <input 
                             id="token-image" 
@@ -424,10 +654,18 @@ export default function CreateToken() {
                             accept="image/*"
                             onChange={(e) => {
                               const file = e.target.files?.[0] || null;
-                              setTokenData({...tokenData, image: file});
+                              if (file) {
+                                handleImageUpload(file);
+                              }
                             }}
+                            disabled={uploadingImage}
                           />
                         </div>
+                      )}
+                      {tokenData.imageUrl && (
+                        <p className="text-xs text-green-400 text-center mt-1">
+                          Ảnh đã tải lên thành công
+                        </p>
                       )}
                     </div>
                   </div>
@@ -510,7 +748,7 @@ export default function CreateToken() {
                       <p className="text-sm text-gray-500 mt-1">Choose from the extensions list on the right</p>
                     </div>
                   ) : (
-                    <Tabs defaultValue={selectedExtensions[0]} className="w-full">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                       <TabsList className="bg-gray-800 w-full flex overflow-x-auto">
                         {selectedExtensions.map(extId => {
                           const extension = tokenExtensions.find(ext => ext.id === extId);
@@ -558,11 +796,15 @@ export default function CreateToken() {
                                     <div key={option.id} className="space-y-1">
                                       <Label htmlFor={`${extId}-${option.id}`} className="text-white text-sm">
                                         {option.label}
+                                        {option.type === 'text' && (option as TextOptionType).required && (
+                                          <span className="text-red-500 ml-1">*</span>
+                                        )}
                                       </Label>
                                       <ExtensionOptionInput
                                         option={option}
                                         value={tokenData.extensionOptions[extId]?.[option.id]}
                                         onChange={(value) => updateExtensionOption(extId, option.id, value)}
+                                        error={validationErrors[extId]?.[option.id]}
                                       />
                                     </div>
                                   ))}
@@ -600,25 +842,56 @@ export default function CreateToken() {
                 {tokenExtensions.map((extension) => {
                   const IconComponent = extension.icon;
                   const isSelected = selectedExtensions.includes(extension.id);
+                  
+                  // Kiểm tra tính tương thích của extension này với các extension đã được chọn
+                  // để hiển thị trạng thái tương thích trong tooltip
+                  let compatibilityStatus = null;
+                  if (!extension.isRequired && !isSelected && !extension.disabled) {
+                    const compatibility = isCompatibleExtension(extension.id, selectedExtensions);
+                    if (!compatibility.compatible) {
+                      const incompatibleExt = tokenExtensions.find(ext => ext.id === compatibility.incompatibleWith);
+                      compatibilityStatus = `Không tương thích với ${incompatibleExt?.name}`;
+                    }
+                  }
+                  
                   return (
                     <div 
                       key={extension.id}
-                      className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                      className={`flex items-center p-3 rounded-lg border transition-colors ${
+                        extension.disabled ? 'bg-gray-800/30 border-gray-700 opacity-60 cursor-not-allowed' :
                         isSelected 
-                          ? 'bg-purple-500/20 border-purple-500' 
-                          : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                          ? 'bg-purple-500/20 border-purple-500 cursor-pointer' 
+                          : compatibilityStatus 
+                            ? 'bg-gray-800/50 border-gray-700 border-red-500/30 cursor-not-allowed' 
+                            : 'bg-gray-800/50 border-gray-700 hover:border-gray-600 cursor-pointer'
                       }`}
-                      onClick={() => toggleExtension(extension.id)}
+                      onClick={() => !extension.disabled && toggleExtension(extension.id)}
                     >
                       <div className={`p-2 rounded-lg ${extension.bgColor} mr-3 shrink-0`}>
                         <IconComponent className={`w-5 h-5 ${extension.color}`} />
                       </div>
                       <div className="flex-grow min-w-0 mr-3">
+                        <div className="flex items-center">
                         <p className="text-white font-medium">{extension.name}</p>
+                          {extension.disabled && (
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-700 text-gray-300 rounded">
+                              Beta
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 line-clamp-2">{extension.description}</p>
+                        {compatibilityStatus && (
+                          <p className="text-xs text-red-400 mt-1">{compatibilityStatus}</p>
+                        )}
+                        {extension.disabled && extension.disabledReason && (
+                          <p className="text-xs text-yellow-500 mt-1">{extension.disabledReason}</p>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center">
-                        <div className={`h-5 w-5 rounded-full ${isSelected ? 'bg-purple-600' : 'bg-gray-700'} flex items-center justify-center`}>
+                        <div className={`h-5 w-5 rounded-full ${
+                          extension.disabled ? 'bg-gray-700' :
+                          isSelected ? 'bg-purple-600' : 'bg-gray-700'
+                        } flex items-center justify-center`}>
                           {isSelected && (
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white">
                               <polyline points="20 6 9 17 4 12"></polyline>

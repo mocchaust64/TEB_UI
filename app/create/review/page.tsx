@@ -27,13 +27,26 @@ import {
   Zap, 
   Shield, 
   FileText, 
-  Users, 
-  ArrowRightLeft,
   Check,
   AlertCircle,
   ArrowLeft,
-  Medal
+  Medal,
+  ExternalLink,
+  Info
 } from "lucide-react"
+import { useConnection, useWallet} from "@solana/wallet-adapter-react"
+import { PublicKey } from "@solana/web3.js"
+
+import { toast } from "sonner"
+import { ipfsToHTTP } from "@/lib/utils/pinata"
+import { createToken } from "@/lib/services/token-service"
+
+// Định nghĩa interface cho kết quả tạo token
+interface TokenCreationResult {
+  mint: PublicKey;
+  signature: string;
+  token: any;
+}
 
 // Định nghĩa kiểu dữ liệu cho token extensions
 type TokenExtensionType = {
@@ -87,48 +100,119 @@ const tokenExtensionsMap: Record<string, TokenExtensionType> = {
     color: "text-orange-400",
     bgColor: "bg-orange-400/10",
   },
-  "cpi-guard": {
-    id: "cpi-guard",
+  "default-account-state": {
+    id: "default-account-state",
     icon: Shield,
-    name: "CPI Guard",
-    description: "Protection against CPI attacks",
+    name: "Default Account State",
+    description: "Set default state for all accounts of this token",
     color: "text-cyan-400",
     bgColor: "bg-cyan-400/10",
   },
-  "metadata-pointer": {
-    id: "metadata-pointer",
+  "mint-close-authority": {
+    id: "mint-close-authority",
+    icon: Key,
+    name: "Mint Close Authority",
+    description: "Authority allowed to close this mint",
+    color: "text-pink-600",
+    bgColor: "bg-pink-600/10",
+  },
+  // Metadata được thêm mặc định, nhưng vẫn giữ lại để hiển thị trong UI review
+  "metadata": {
+    id: "metadata",
     icon: FileText,
-    name: "Metadata Pointer",
-    description: "Link metadata directly to the token",
+    name: "Token Metadata",
+    description: "Metadata embedded directly in the token (always enabled)",
     color: "text-pink-400",
     bgColor: "bg-pink-400/10",
-  },
-  "group-pointer": {
-    id: "group-pointer",
-    icon: Users,
-    name: "Group Pointer",
-    description: "Group related tokens together",
-    color: "text-indigo-400",
-    bgColor: "bg-indigo-400/10",
-  },
-  "required-memo": {
-    id: "required-memo",
-    icon: ArrowRightLeft,
-    name: "Required Memo",
-    description: "Require memo for all transactions",
-    color: "text-emerald-400",
-    bgColor: "bg-emerald-400/10",
-  },
+  }
 }
+
+// Định nghĩa các cặp extensions không tương thích
+const incompatibleExtensionPairs: [string, string][] = [
+  ["transfer-fees", "non-transferable"],
+  ["non-transferable", "transfer-hook"],
+  ["confidential-transfer", "transfer-fees"],
+  ["confidential-transfer", "transfer-hook"],
+  ["confidential-transfer", "permanent-delegate"],
+  ["confidential-transfer", "non-transferable"]
+];
+
+// Hàm kiểm tra xem danh sách extensions có tương thích với nhau không
+const checkExtensionsCompatibility = (extensions: string[]): { 
+  compatible: boolean; 
+  incompatiblePairs?: [string, string][] 
+} => {
+  const incompatiblePairs: [string, string][] = [];
+  
+  for (let i = 0; i < extensions.length; i++) {
+    for (let j = i + 1; j < extensions.length; j++) {
+      const ext1 = extensions[i];
+      const ext2 = extensions[j];
+      
+      // Kiểm tra từng cặp extensions
+      const isIncompatible = incompatibleExtensionPairs.some(
+        pair => (pair[0] === ext1 && pair[1] === ext2) || 
+                (pair[0] === ext2 && pair[1] === ext1)
+      );
+      
+      if (isIncompatible) {
+        incompatiblePairs.push([ext1, ext2]);
+      }
+    }
+  }
+  
+  return { 
+    compatible: incompatiblePairs.length === 0,
+    incompatiblePairs: incompatiblePairs.length > 0 ? incompatiblePairs : undefined
+  };
+};
+
+// Hàm kiểm tra tính đầy đủ thông tin của extensions đã chọn
+const checkExtensionRequiredFields = (extensions: string[], extensionOptions: Record<string, any>): { 
+  valid: boolean; 
+  missingFields: Record<string, string[]>;
+} => {
+  const missingFields: Record<string, string[]> = {};
+  let valid = true;
+  
+  for (const extensionId of extensions) {
+    const extension = tokenExtensionsMap[extensionId];
+    if (!extension) continue;
+    
+    // Kiểm tra các extension cần có thông tin nhập
+    if (extensionId === "permanent-delegate") {
+      const delegateAddress = extensionOptions[extensionId]?.["delegate-address"];
+      if (!delegateAddress || typeof delegateAddress !== 'string' || delegateAddress.trim() === '') {
+        missingFields[extensionId] = [...(missingFields[extensionId] || []), "Delegate Address"];
+        valid = false;
+      }
+    }
+    else if (extensionId === "mint-close-authority") {
+      const closeAuthority = extensionOptions[extensionId]?.["close-authority"];
+      if (!closeAuthority || typeof closeAuthority !== 'string' || closeAuthority.trim() === '') {
+        missingFields[extensionId] = [...(missingFields[extensionId] || []), "Close Authority Address"];
+        valid = false;
+      }
+    }
+  }
+  
+  return { valid, missingFields };
+};
 
 export default function ReviewToken() {
   const router = useRouter()
+  const { connection } = useConnection()
+  const wallet = useWallet()
   const [isLoading, setIsLoading] = useState(true)
   const [tokenData, setTokenData] = useState<any>(null)
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [imageBase64, setImageBase64] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [createdTokenMint, setCreatedTokenMint] = useState<string | null>(null)
+  const [transactionSignature, setTransactionSignature] = useState<string | null>(null)
+  const [creationError, setCreationError] = useState<string | null>(null)
+  const [metadataUri, setMetadataUri] = useState<string>("")
 
   useEffect(() => {
     // Mô phỏng việc tải dữ liệu
@@ -138,6 +222,7 @@ export default function ReviewToken() {
         const savedData = localStorage.getItem('tokenData')
         if (savedData) {
           const parsedData = JSON.parse(savedData)
+          
           setTokenData({
             name: parsedData.name,
             symbol: parsedData.symbol,
@@ -145,7 +230,6 @@ export default function ReviewToken() {
             supply: parsedData.supply,
             description: parsedData.description,
             extensionOptions: parsedData.extensionOptions,
-            // Thêm các URL mạng xã hội
             websiteUrl: parsedData.websiteUrl || "",
             twitterUrl: parsedData.twitterUrl || "",
             telegramUrl: parsedData.telegramUrl || "",
@@ -153,11 +237,52 @@ export default function ReviewToken() {
           })
           
           if (parsedData.selectedExtensions) {
-            setSelectedExtensions(parsedData.selectedExtensions)
+            // Thêm "metadata" vào danh sách extension để hiển thị trong review
+            const extensions = [...parsedData.selectedExtensions];
+            if (!extensions.includes("metadata")) {
+              extensions.push("metadata");
+            }
+            
+            // Kiểm tra tính tương thích của các extensions
+            const compatibility = checkExtensionsCompatibility(extensions);
+            if (!compatibility.compatible && compatibility.incompatiblePairs) {
+              const incompatibleNames = compatibility.incompatiblePairs.map(pair => {
+                const ext1 = tokenExtensionsMap[pair[0]]?.name || pair[0];
+                const ext2 = tokenExtensionsMap[pair[1]]?.name || pair[1];
+                return `${ext1} và ${ext2}`;
+              }).join(", ");
+              
+              toast.error(
+                `Phát hiện các extensions không tương thích: ${incompatibleNames}. Vui lòng quay lại trang tạo token và điều chỉnh.`, 
+                { duration: 6000 }
+              );
+            }
+            
+            // Kiểm tra thông tin bắt buộc của các extensions
+            const requiredCheck = checkExtensionRequiredFields(extensions, parsedData.extensionOptions);
+            if (!requiredCheck.valid) {
+              const missingFieldsInfo = Object.entries(requiredCheck.missingFields)
+                .map(([extId, fields]) => {
+                  const extName = tokenExtensionsMap[extId]?.name || extId;
+                  return `${extName}: ${fields.join(', ')}`;
+                }).join("; ");
+              
+              toast.error(
+                `Thiếu thông tin bắt buộc cho các extension: ${missingFieldsInfo}. Vui lòng quay lại trang tạo token và nhập đầy đủ.`,
+                { duration: 6000 }
+              );
+              
+              // Quay lại trang tạo token
+              setTimeout(() => {
+                router.push('/create');
+              }, 3000);
+            }
+            
+            setSelectedExtensions(extensions);
           }
           
-          if (parsedData.imageBase64) {
-            setImageBase64(parsedData.imageBase64)
+          if (parsedData.imageUrl) {
+            setImageUrl(parsedData.imageUrl)
           }
 
           setIsLoading(false)
@@ -171,17 +296,102 @@ export default function ReviewToken() {
     loadData()
   }, [router])
 
-  const handleConfirmCreate = () => {
-    setIsCreating(true)
+  const handleConfirmCreate = async () => {
+    if (!wallet.connected || !connection) {
+      toast.error("Please connect your wallet first")
+      return
+    }
+
+    if (!wallet.publicKey) {
+      toast.error("Wallet public key not available")
+      return
+    }
     
-    // Mô phỏng quá trình tạo token (sẽ thay thế bằng logic thực tế sau)
-    setTimeout(() => {
-      setIsCreating(false)
-      setSuccess(true)
+    // Kiểm tra tính tương thích của các extensions một lần nữa trước khi tạo token
+    const compatibility = checkExtensionsCompatibility(selectedExtensions);
+    if (!compatibility.compatible) {
+      const incompatibleNames = compatibility.incompatiblePairs!.map(pair => {
+        const ext1 = tokenExtensionsMap[pair[0]]?.name || pair[0];
+        const ext2 = tokenExtensionsMap[pair[1]]?.name || pair[1];
+        return `${ext1} và ${ext2}`;
+      }).join(", ");
+      
+      toast.error(`Không thể tạo token: Các extensions ${incompatibleNames} không tương thích với nhau`);
+      return;
+    }
+    
+    // Kiểm tra thông tin bắt buộc của các extensions một lần nữa
+    const requiredCheck = checkExtensionRequiredFields(selectedExtensions, tokenData.extensionOptions);
+    if (!requiredCheck.valid) {
+      const missingFieldsInfo = Object.entries(requiredCheck.missingFields)
+        .map(([extId, fields]) => {
+          const extName = tokenExtensionsMap[extId]?.name || extId;
+          return `${extName}: ${fields.join(', ')}`;
+        }).join("; ");
+      
+      toast.error(`Không thể tạo token: Thiếu thông tin bắt buộc cho các extension - ${missingFieldsInfo}`);
+      return;
+    }
+    
+    // Kiểm tra khả năng ký
+    if (!wallet.signTransaction) {
+      toast.error("Wallet does not support transaction signing")
+      return
+    }
+
+    setIsCreating(true)
+    setCreationError(null)
+    
+    try {
+      // Hiển thị thông báo chi tiết về từng bước
+      const toastId1 = toast.loading("Đang chuẩn bị dữ liệu token...");
+      
+      // Chuẩn bị dữ liệu token với imageUrl
+      const tokenDataWithImage = {
+        ...tokenData,
+        imageUrl: imageUrl
+      };
+      
+      // Truyền trực tiếp wallet context vào service
+      const result = await createToken(
+        connection,
+        wallet,
+        tokenDataWithImage,
+        selectedExtensions
+      );
+      
+      toast.dismiss(toastId1);
+      toast.success("Đã tạo token thành công!");
+      
+      // Phần còn lại giữ nguyên
+      setCreatedTokenMint(result.mint);
+      setTransactionSignature(result.signature);
+      setMetadataUri(result.metadataUri);
+      setSuccess(true);
       
       // Xóa dữ liệu trong localStorage sau khi tạo thành công
-      localStorage.removeItem('tokenData')
-    }, 2000)
+      localStorage.removeItem('tokenData');
+    } catch (error: any) {
+      // Xử lý các lỗi cụ thể liên quan đến wallet
+      console.error("Detailed token creation error:", error);
+      
+      let errorMessage = error.message || "Error creating token";
+      
+      if (error.code === 4001) {
+        errorMessage = "Transaction rejected by user";
+      } else if (errorMessage.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds to complete the transaction. Please add more SOL to your wallet.";
+      } else if (errorMessage.includes("blockhash")) {
+        errorMessage = "Transaction timeout. Please try again.";
+      } else if (errorMessage.includes("transaction too large")) {
+        errorMessage = "Transaction size exceeds limit. Try reducing the number of extensions.";
+      }
+      
+      setCreationError(errorMessage);
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   const handleBack = () => {
@@ -240,19 +450,51 @@ export default function ReviewToken() {
                 <h3 className="text-white font-semibold">Token Details</h3>
               </div>
               
-              {imageBase64 && (
-                <div className="mb-6 flex justify-center">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-purple-500/30 bg-gray-800">
-                    <img 
-                      src={imageBase64} 
+              {imageUrl ? (
+                <div className="pt-4 border-t border-gray-700">
+                  <p className="text-gray-400 text-sm">Token Image:</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-purple-500/30 bg-gray-800 mr-3">
+                      <img 
+                        src={imageUrl} 
                       alt="Token Icon" 
                       className="w-full h-full object-cover"
                     />
+                    </div>
+                    <div>
+                      <a 
+                        href={ipfsToHTTP(metadataUri || "")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 text-sm flex items-center"
+                      >
+                        View Token Metadata
+                        <ExternalLink className="inline-block ml-1 h-3 w-3" />
+                      </a>
+                      <p className="text-gray-500 text-xs mt-1">
+                        Image will be displayed in wallets and explorers
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-4 border-t border-gray-700">
+                  <p className="text-gray-400 text-sm">Token Image:</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-700 bg-gray-800 mr-3 flex items-center justify-center">
+                      <Info className="w-6 h-6 text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="text-yellow-400 text-sm">No image provided</p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        Your token will be created without an image
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-4 text-left">
+              <div className="grid grid-cols-2 gap-4 text-left mb-4">
                 <div>
                   <p className="text-gray-400 text-sm">Token Name:</p>
                   <p className="text-white font-medium">{tokenData.name}</p>
@@ -263,12 +505,66 @@ export default function ReviewToken() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Decimals:</p>
-                  <p className="text-white font-medium">{tokenData.decimals}</p>
+                  <p className="text-white font-medium text-lg">{tokenData.decimals}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Supply:</p>
                   <p className="text-white font-medium">{parseInt(tokenData.supply).toLocaleString()}</p>
                 </div>
+              </div>
+
+              <div className="border-t border-gray-700 pt-4 mt-2">
+                <p className="text-gray-400 text-sm">Mint Address:</p>
+                <p className="text-white font-mono text-sm break-all">{createdTokenMint}</p>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-gray-400 text-sm">Transaction:</p>
+                <a 
+                  href={`https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 font-mono text-sm break-all flex items-center"
+                >
+                  {transactionSignature}
+                  <ExternalLink className="inline-block ml-1 h-3 w-3" />
+                </a>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-gray-400 text-sm">Metadata:</p>
+                <div className="flex items-center">
+                  <a 
+                    href={ipfsToHTTP(metadataUri || "")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 font-mono text-sm break-all flex items-center"
+                  >
+                    {metadataUri ? 
+                      <>
+                        View Token Metadata
+                    <ExternalLink className="inline-block ml-1 h-3 w-3" />
+                      </> : 
+                      "Metadata not available yet"
+                    }
+                  </a>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2 h-7 text-xs"
+                    onClick={() => {
+                      if (metadataUri) {
+                        window.open(ipfsToHTTP(metadataUri), '_blank');
+                      }
+                    }}
+                    disabled={!metadataUri}
+                  >
+                    Verify
+                  </Button>
+                </div>
+                <p className="text-gray-500 text-xs mt-1">
+                  Tip: Verify your token metadata to ensure all attributes are correctly displayed on Solscan
+                </p>
               </div>
 
               {/* Hiển thị các liên kết mạng xã hội */}
@@ -344,12 +640,20 @@ export default function ReviewToken() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.5 }}
+              className="flex justify-center space-x-4"
             >
               <Button 
                 onClick={goToHome}
                 className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-6 text-lg"
               >
                 Return to Home
+              </Button>
+              
+              <Button 
+                onClick={() => window.open(`https://explorer.solana.com/address/${createdTokenMint}?cluster=devnet`, '_blank')}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-8 py-6 text-lg"
+              >
+                View on Explorer
               </Button>
             </motion.div>
           </div>
@@ -415,12 +719,12 @@ export default function ReviewToken() {
                   </div>
                 </div>
 
-                {imageBase64 && (
+                {imageUrl && (
                   <div className="pt-2 flex flex-col items-center">
                     <h3 className="text-sm text-gray-400 mb-3">Token Image</h3>
                     <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-purple-500/30 flex items-center justify-center bg-gray-800">
                       <img 
-                        src={imageBase64} 
+                        src={imageUrl} 
                         alt="Token" 
                         className="h-full w-full object-cover"
                       />
@@ -543,7 +847,6 @@ export default function ReviewToken() {
                       const IconComponent = extension.icon;
                       
                       const extensionOptions = tokenData.extensionOptions?.[extId];
-                      const hasOptions = extensionOptions && Object.keys(extensionOptions).length > 0;
                       
                       return (
                         <div 
@@ -554,19 +857,10 @@ export default function ReviewToken() {
                             <div className={`p-2 rounded-lg ${extension.bgColor} mr-3`}>
                               <IconComponent className={`w-4 h-4 ${extension.color}`} />
                             </div>
-                            <div>
+                            <div className="w-full">
                               <p className="text-white font-medium">{extension.name}</p>
-                              {hasOptions && (
-                                <div className="mt-2 pl-2 border-l-2 border-gray-700">
-                                  {Object.entries(extensionOptions).map(([key, value]) => (
-                                    <div key={key} className="text-xs text-gray-400">
-                                      <span className="text-gray-500">{key}: </span>
-                                      <span>{String(value)}</span>
+                              {renderExtensionDetails(extId, extensionOptions)}
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </div>
                       );
@@ -618,3 +912,52 @@ export default function ReviewToken() {
     </CommonLayout>
   )
 } 
+
+// Hiển thị chi tiết cấu hình extension trong review
+const renderExtensionDetails = (extId: string, options: any) => {
+  if (extId === "permanent-delegate" && options?.["delegate-address"]) {
+    return (
+      <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
+        <div className="flex">
+          <span className="text-gray-500 w-24">Address:</span>
+          <span className="text-gray-300 truncate font-mono">{options["delegate-address"]}</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (extId === "transfer-fees" && options?.["fee-percentage"] !== undefined) {
+    return (
+      <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
+        <div className="flex">
+          <span className="text-gray-500 w-24">Fee Rate:</span>
+          <span className="text-gray-300">{options["fee-percentage"]}%</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (extId === "interest-bearing" && options?.["interest-rate"] !== undefined) {
+    return (
+      <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
+        <div className="flex">
+          <span className="text-gray-500 w-24">Annual Rate:</span>
+          <span className="text-gray-300">{options["interest-rate"]}%</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (extId === "mint-close-authority" && options?.["close-authority"]) {
+    return (
+      <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
+        <div className="flex">
+          <span className="text-gray-500 w-24">Authority:</span>
+          <span className="text-gray-300 truncate font-mono">{options["close-authority"]}</span>
+        </div>
+      </div>
+    );
+  }
+  
+  return null;
+}; 

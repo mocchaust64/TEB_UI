@@ -15,6 +15,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { WalletButton } from "@/components/wallet-button"
+import { NetworkSelector } from "@/components/network-selector"
+import { EndpointSettings } from "@/components/endpoint-settings"
 import type React from "react"
 import { useEffect, useState } from "react"
 import Image from "next/image"
@@ -141,7 +143,9 @@ export default function Navbar() {
           <NavLink href="/docs">Documentation</NavLink>
         </div>
 
-        <div className="hidden md:flex items-center">
+        <div className="hidden md:flex items-center space-x-3">
+          <EndpointSettings />
+          <NetworkSelector />
           <WalletButton />
         </div>
 
@@ -182,7 +186,7 @@ export default function Navbar() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input 
                     type="text"
-                    placeholder="Tìm kiếm..."
+                    placeholder="Search..."
                     className="pl-10 pr-4 py-2 bg-gray-800/70 border-gray-700 text-white w-full rounded-md"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -198,7 +202,7 @@ export default function Navbar() {
                 </div>
               </motion.div>
 
-              {/* Hiển thị kết quả tìm kiếm */}
+              {/* Search results */}
               {filteredLinks.length === 0 ? (
                 <motion.div
                   variants={menuItemVariants}
@@ -207,7 +211,7 @@ export default function Navbar() {
                   custom={1}
                   className="text-center py-6 text-gray-400"
                 >
-                  Không tìm thấy kết quả phù hợp
+                  No results found
                 </motion.div>
               ) : (
                 filteredLinks.map((link, i) => (
@@ -238,7 +242,12 @@ export default function Navbar() {
                 exit="exit"
                 className="pt-4 mt-2 border-t border-gray-700"
               >
-                <div className="px-4 py-3">
+                <div className="flex flex-col space-y-3 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-400">Cài đặt mạng</div>
+                    <EndpointSettings />
+                  </div>
+                  <NetworkSelector />
                   <WalletButton />
                 </div>
               </motion.div>

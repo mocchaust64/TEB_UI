@@ -5,6 +5,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { Button } from "@/components/ui/button"
 import { Wallet, Copy, ExternalLink, LogOut, ChevronDown } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useNetwork } from "@/lib/hooks/use-network"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
 
 export function WalletButton() {
   const { publicKey, disconnect, connected } = useWallet()
+  const { explorerUrl, selectedNetwork, currentNetworkOption } = useNetwork()
   const [copied, setCopied] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768
@@ -33,6 +35,13 @@ export function WalletButton() {
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`
+  }
+  
+  const openExplorer = () => {
+    if (publicKey) {
+      const url = `${currentNetworkOption.explorerUrl}/address/${publicKey.toString()}`
+      window.open(url, "_blank")
+    }
   }
   
   if (!isMounted) {
@@ -76,9 +85,7 @@ export function WalletButton() {
           <span className="flex-1 truncate">{copied ? "Copied!" : "Copy Address"}</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() =>
-            window.open(`https://explorer.solana.com/address/${publicKey.toString()}?cluster=devnet`, "_blank")
-          }
+          onClick={openExplorer}
           className="text-white hover:bg-gray-800 cursor-pointer flex items-center"
         >
           <ExternalLink className="mr-2 h-4 w-4" />
