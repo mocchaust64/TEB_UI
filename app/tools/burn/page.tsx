@@ -7,10 +7,14 @@ import { CommonLayout } from "@/components/common-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { 
-  Layers,
+  Flame,
   ArrowLeft,
   Loader2,
-  AlertCircle
+  Info,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink,
+  Search
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { 
@@ -27,37 +31,23 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
-
-// Dữ liệu mẫu
-const mockTokens = [
-  {
-    id: "1",
-    name: "Sample Token",
-    symbol: "SMPL",
-    balance: "1000000",
-    decimals: 9,
-    displayBalance: "1,000,000",
-    burnAuthority: true
-  },
-  {
-    id: "2",
-    name: "Test Token",
-    symbol: "TEST",
-    balance: "500000",
-    decimals: 9,
-    displayBalance: "500,000",
-    burnAuthority: true
-  },
-  {
-    id: "3",
-    name: "Demo Coin",
-    symbol: "DEMO",
-    balance: "750000",
-    decimals: 6,
-    displayBalance: "750,000",
-    burnAuthority: false
-  }
-]
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { useWallet, useConnection } from "@solana/wallet-adapter-react"
+import { WalletButton } from "@/components/wallet-button"
+import { PublicKey } from "@solana/web3.js"
+import { toast } from "sonner"
+import { TokenItemWithDetails } from "@/lib/utils/token-extensions"
+import { fetchTokensFromBlockchain, burnToken } from "@/lib/services/token-service"
+import { formatTokenBalance } from "@/lib/utils/format-utils"
+import { useTokenSearch } from "@/hooks/use-token-search"
+import Link from "next/link"
 
 export default function BurnToken() {
   const router = useRouter();
@@ -65,35 +55,150 @@ export default function BurnToken() {
   const [selectedToken, setSelectedToken] = useState<string | undefined>();
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentToken, setCurrentToken] = useState<any>(null);
+  const [currentToken, setCurrentToken] = useState<TokenItemWithDetails | null>(null);
+  const [tokens, setTokens] = useState<TokenItemWithDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
+  const [tokenSearchTerm, setTokenSearchTerm] = useState("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
+  // Lấy wallet và connection
+  const wallet = useWallet();
+  const { publicKey, connected } = wallet;
+  const { connection } = useConnection();
+  
+  // Hook tìm kiếm token
+  const { filteredTokens, setSearchTerm } = useTokenSearch({
+    tokens,
+    initialSearchTerm: tokenSearchTerm
+  });
   
   useEffect(() => {
     setIsMounted(true);
   }, []);
   
+  // Load tokens khi wallet kết nối
   useEffect(() => {
-    if (selectedToken) {
-      const token = mockTokens.find(t => t.id === selectedToken);
-      setCurrentToken(token);
+    if (isMounted && connected && publicKey && connection) {
+      loadTokens(false);
+    }
+  }, [isMounted, connected, publicKey, connection]);
+  
+  // Cập nhật token hiện tại khi chọn token
+  useEffect(() => {
+    if (selectedToken && tokens.length > 0) {
+      const token = tokens.find(t => t.id === selectedToken);
+      setCurrentToken(token || null);
     } else {
       setCurrentToken(null);
     }
-  }, [selectedToken]);
+  }, [selectedToken, tokens]);
   
-  const handleBurn = async () => {
-    setIsProcessing(true);
+  // Hàm load tokens từ blockchain
+  const loadTokens = async (forceRefresh = false) => {
+    if (!publicKey || !connection || !wallet) return;
     
-    // Giả lập quá trình đốt token
-    setTimeout(() => {
-      setIsProcessing(false);
-      alert("Đốt token thành công!");
-      router.push("/tools");
-    }, 2000);
+    if (!forceRefresh) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+    setIsError(false);
+    
+    try {
+      const userTokens = await fetchTokensFromBlockchain(connection, wallet, {
+        forceRefresh: true,
+        onError: () => setIsError(true)
+      });
+      
+      if (userTokens) {
+        // Chỉ lấy token có số dư > 0
+        const tokensWithBalance = userTokens.filter(token => parseFloat(token.balance) > 0);
+        setTokens(tokensWithBalance);
+      }
+    } catch (error) {
+      console.error("Error loading tokens:", error);
+      setIsError(true);
+      toast.error("Không thể tải danh sách token");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
   
-  const handleMaxAmount = () => {
-    if (currentToken) {
-      setAmount(currentToken.balance);
+  // Hàm làm mới token
+  const handleRefreshTokens = () => {
+    loadTokens(true);
+  };
+  
+  // Hàm xử lý tìm kiếm token
+  const handleTokenSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTokenSearchTerm(e.target.value);
+    setSearchTerm(e.target.value);
+  };
+  
+  // Mở dialog xác nhận
+  const openConfirmDialog = () => {
+    if (!currentToken || !amount) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+    
+    // Kiểm tra số lượng
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error("Số lượng không hợp lệ");
+      return;
+    }
+    
+    // Kiểm tra xem có đủ số dư không
+    const balance = parseFloat(currentToken.balance);
+    if (numAmount > balance) {
+      toast.error(`Số dư không đủ. Bạn chỉ có ${balance} ${currentToken.symbol}`);
+      return;
+    }
+    
+    setShowConfirmDialog(true);
+  };
+  
+  // Hàm đốt token
+  const handleBurn = async () => {
+    if (!currentToken || !amount || !connection || !publicKey) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+    
+    setShowConfirmDialog(false);
+    setIsProcessing(true);
+    setTransactionSignature(null);
+    
+    try {
+      toast.loading("Đang xử lý giao dịch đốt token...");
+      
+      const signature = await burnToken(
+        connection,
+        wallet,
+        currentToken.id,
+        amount,
+        currentToken.decimals
+      );
+      
+      toast.dismiss();
+      toast.success("Đốt token thành công!");
+      setTransactionSignature(signature);
+      
+      // Làm mới danh sách token sau khi đốt thành công
+      setTimeout(() => {
+        loadTokens(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Error burning token:", error);
+      toast.dismiss();
+      toast.error("Có lỗi xảy ra khi đốt token");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,13 +241,13 @@ export default function BurnToken() {
           className="flex flex-col items-center mb-10"
         >
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center mb-4">
-            <Layers className="w-8 h-8 text-red-400" />
+            <Flame className="w-8 h-8 text-red-400" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
             Đốt Token
           </h1>
           <p className="text-gray-400 text-lg max-w-xl text-center">
-            Đốt (hủy) token vĩnh viễn để giảm lượng cung lưu hành
+            Giảm số lượng token trong lưu thông bằng cách đốt token từ ví của bạn
           </p>
         </motion.div>
         
@@ -152,121 +257,331 @@ export default function BurnToken() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="mx-auto max-w-xl"
         >
-          <Card className="bg-gray-900/50 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white text-xl">Chi tiết đốt token</CardTitle>
-              <CardDescription className="text-gray-400">
-                Điền thông tin chi tiết để đốt token
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="bg-red-900/20 border-red-700 text-red-100">
-                <AlertCircle className="h-4 w-4 text-red-400" />
-                <AlertTitle>Cảnh báo quan trọng</AlertTitle>
-                <AlertDescription className="text-red-200">
-                  Token đã đốt sẽ bị hủy vĩnh viễn và không thể khôi phục. Hãy kiểm tra kỹ số lượng trước khi thực hiện.
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-white">Chọn Token</Label>
-                <Select value={selectedToken} onValueChange={setSelectedToken}>
-                  <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
-                    <SelectValue placeholder="Chọn token để đốt" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {mockTokens.map((token) => (
-                      <SelectItem 
-                        key={token.id} 
-                        value={token.id}
-                        disabled={!token.burnAuthority}
-                      >
-                        <div className="flex items-center">
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center mr-2">
-                            <span className="text-white text-xs font-bold">{token.symbol.charAt(0)}</span>
-                          </div>
-                          <span>{token.name} ({token.symbol})</span>
-                          {!token.burnAuthority && (
-                            <span className="ml-2 text-red-400 text-xs">Không thể đốt</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {currentToken && (
-                <div className="bg-gray-800/40 rounded-md p-3 flex justify-between items-center">
+          {!connected ? (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardContent className="p-8 flex flex-col items-center justify-center text-center">
+                <Flame className="w-12 h-12 text-gray-500 mb-4" />
+                <h3 className="text-white text-xl font-medium mb-2">Kết nối ví của bạn</h3>
+                <p className="text-gray-400 mb-6">
+                  Bạn cần kết nối ví Solana để đốt token
+                </p>
+                <WalletButton />
+              </CardContent>
+            </Card>
+          ) : transactionSignature ? (
+            <Card className="bg-gray-900/50 border-gray-700 mb-6">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="32" 
+                    height="32" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="text-green-500"
+                  >
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </div>
+                <h3 className="text-white text-xl font-medium mb-2">Đốt token thành công!</h3>
+                <p className="text-gray-400 mb-4">
+                  Giao dịch đã được xác nhận trên blockchain
+                </p>
+                <div className="bg-gray-800/50 rounded-md p-3 w-full mb-4">
+                  <p className="text-sm text-gray-400 mb-1">Signature</p>
+                  <p className="text-xs text-gray-300 break-all">{transactionSignature}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Link 
+                    href={`https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="outline" className="flex items-center gap-1">
+                      <ExternalLink className="w-4 h-4" />
+                      Xem trên Explorer
+                    </Button>
+                  </Link>
+                  <Button 
+                    onClick={() => {
+                      setTransactionSignature(null);
+                      setAmount("");
+                      loadTokens(true);
+                    }}
+                  >
+                    Đốt tiếp
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Số dư hiện tại</p>
-                    <p className="text-white font-medium">{currentToken.displayBalance} {currentToken.symbol}</p>
+                    <CardTitle className="text-white text-xl">Chi tiết đốt token</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Điền thông tin chi tiết để đốt token
+                    </CardDescription>
                   </div>
-                  <div className="text-right">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-gray-400 hover:text-white"
+                    onClick={handleRefreshTokens}
+                    disabled={isLoading || isRefreshing}
+                  >
+                    <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="bg-red-900/20 border-red-700 text-red-100">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <AlertTitle>Chú ý quan trọng</AlertTitle>
+                  <AlertDescription className="text-red-200">
+                    Đốt token là hành động không thể hoàn tác. Token đã đốt sẽ bị loại bỏ vĩnh viễn khỏi lưu thông.
+                  </AlertDescription>
+                </Alert>
+
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Loader2 className="w-10 h-10 text-red-500 animate-spin mb-4" />
+                    <p className="text-gray-400">Đang tải danh sách token...</p>
+                  </div>
+                ) : isError ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
+                    <p className="text-white text-lg font-medium mb-2">Không thể tải token</p>
+                    <p className="text-gray-400 mb-4">Có lỗi xảy ra khi tải danh sách token</p>
                     <Button 
-                      variant="ghost" 
-                      className="text-red-400 hover:text-red-300 text-sm p-1"
-                      onClick={handleMaxAmount}
+                      variant="outline" 
+                      className="border-gray-600 text-white"
+                      onClick={() => loadTokens(true)}
                     >
-                      MAX
+                      Thử lại
                     </Button>
                   </div>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="amount" className="text-white">Số lượng muốn đốt</Label>
-                <Input
-                  id="amount"
-                  type="text"
-                  placeholder="Nhập số lượng token muốn đốt"
-                  className="bg-gray-800/70 border-gray-700 text-white"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-              
-              <Separator className="bg-gray-700" />
-              
-              {currentToken && amount && (
-                <div className="bg-gray-800/40 rounded-md p-3">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm text-gray-400">Số dư hiện tại</p>
-                    <p className="text-white font-medium">{currentToken.displayBalance} {currentToken.symbol}</p>
+                ) : tokens.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Flame className="w-10 h-10 text-gray-500 mb-4" />
+                    <p className="text-white text-lg font-medium mb-2">Không có token</p>
+                    <p className="text-gray-400 mb-4">Bạn không có token nào để đốt</p>
+                    <Button 
+                      variant="outline" 
+                      className="border-gray-600 text-white"
+                      onClick={() => router.push("/create")}
+                    >
+                      Tạo token mới
+                    </Button>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-gray-400">Số dư sau khi đốt</p>
-                    <p className="text-white font-medium">
-                      {(parseInt(currentToken.balance) - parseInt(amount || "0")).toLocaleString()} {currentToken.symbol}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button 
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-                disabled={!selectedToken || !amount || isProcessing || !currentToken?.burnAuthority}
-                onClick={handleBurn}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý
-                  </>
                 ) : (
                   <>
-                    <Layers className="mr-2 h-4 w-4" /> Đốt Token
+                    <div className="space-y-2">
+                      <Label htmlFor="token" className="text-white">Chọn Token</Label>
+                      <Select value={selectedToken} onValueChange={setSelectedToken}>
+                        <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
+                          <SelectValue placeholder="Chọn token để đốt" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700 max-h-80">
+                          <div className="flex items-center px-2 pb-1 sticky top-0 bg-gray-800 z-10">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-4" />
+                            <Input 
+                              placeholder="Tìm kiếm token..." 
+                              className="pl-8 bg-gray-700/50 border-gray-600 text-white text-sm"
+                              value={tokenSearchTerm}
+                              onChange={handleTokenSearch}
+                            />
+                          </div>
+                          
+                          {filteredTokens.length > 0 ? (
+                            filteredTokens.map((token) => (
+                              <SelectItem 
+                                key={token.id} 
+                                value={token.id}
+                              >
+                                <div className="flex items-center">
+                                  <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center mr-2">
+                                    {token.image ? (
+                                      <img 
+                                        src={token.image} 
+                                        alt={token.name} 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
+                                        <span className="text-white text-xs font-bold">{token.symbol.charAt(0)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span>{token.name} ({token.symbol})</span>
+                                  <span className="ml-2 text-gray-400 text-xs">
+                                    Số dư: {formatTokenBalance(token.balance, token.decimals)}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-center text-gray-400 text-sm">
+                              Không tìm thấy token nào
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {currentToken && (
+                      <div className="bg-gray-800/40 rounded-md p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-sm text-gray-400">Số dư hiện tại</p>
+                          <p className="text-white font-medium">{formatTokenBalance(currentToken.balance, currentToken.decimals)} {currentToken.symbol}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="amount" className="text-white">Số lượng</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="amount"
+                          type="text"
+                          placeholder="Nhập số lượng token muốn đốt"
+                          className="bg-gray-800/70 border-gray-700 text-white flex-1"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                        />
+                        {currentToken && (
+                          <Button 
+                            variant="outline"
+                            size="sm" 
+                            className="text-sm"
+                            onClick={() => setAmount(currentToken.balance)}
+                          >
+                            MAX
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <Separator className="bg-gray-700" />
+                    
+                    {currentToken && amount && (
+                      <div className="rounded-md p-3">
+                        <p className="text-sm text-gray-400 mb-1">Số dư sau khi đốt</p>
+                        <p className="text-white font-medium text-lg">
+                          {amount 
+                            ? formatTokenBalance(Math.max(0, parseFloat(currentToken.balance) - parseFloat(amount)), currentToken.decimals)
+                            : formatTokenBalance(currentToken.balance, currentToken.decimals)
+                          } {currentToken.symbol}
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
-              </Button>
-              
-              <p className="text-xs text-gray-400 text-center">
-                Giao dịch đốt token sẽ được xác nhận thông qua ví đã kết nối của bạn.
-              </p>
-            </CardFooter>
-          </Card>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-4">
+                <Button 
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  disabled={!selectedToken || !amount || isProcessing || !currentToken}
+                  onClick={openConfirmDialog}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý
+                    </>
+                  ) : (
+                    <>
+                      <Flame className="mr-2 h-4 w-4" /> Đốt Token
+                    </>
+                  )}
+                </Button>
+                
+                <p className="text-xs text-gray-400 text-center">
+                  Giao dịch đốt token sẽ được xác nhận thông qua ví đã kết nối của bạn.
+                </p>
+              </CardFooter>
+            </Card>
+          )}
         </motion.div>
       </div>
+
+      {/* Dialog xác nhận đốt token */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <Flame className="h-5 w-5 text-red-500" />
+              Xác nhận đốt token
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Đốt token là hành động không thể hoàn tác. Vui lòng xác nhận thông tin dưới đây.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentToken && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
+                  {currentToken.image ? (
+                    <img 
+                      src={currentToken.image} 
+                      alt={currentToken.name} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
+                      <span className="text-white font-bold">{currentToken.symbol.charAt(0)}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-white">{currentToken.name}</p>
+                  <p className="text-sm text-gray-400">{currentToken.symbol}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 bg-gray-800/50 rounded-lg">
+                  <p className="text-gray-400 mb-1">Số lượng đốt</p>
+                  <p className="text-white font-medium text-lg">{formatTokenBalance(amount, currentToken.decimals)}</p>
+                </div>
+                <div className="p-3 bg-gray-800/50 rounded-lg">
+                  <p className="text-gray-400 mb-1">Số dư sau khi đốt</p>
+                  <p className="text-white font-medium text-lg">{formatTokenBalance(Math.max(0, parseFloat(currentToken.balance) - parseFloat(amount)), currentToken.decimals)}</p>
+                </div>
+              </div>
+              
+              <Alert className="bg-red-900/20 border-red-700">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                <AlertDescription className="text-red-200">
+                  Token đã đốt sẽ bị loại bỏ vĩnh viễn khỏi lưu thông và không thể khôi phục.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+          
+          <DialogFooter className="gap-3 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowConfirmDialog(false)}
+              className="border-gray-700 text-white"
+            >
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleBurn}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Xác nhận đốt token
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CommonLayout>
   )
 } 

@@ -1,4 +1,4 @@
-import { TokenBuilder ,TransferFeeToken} from "solana-token-extension-boost";
+import { TokenBuilder ,TransferFeeToken, Token} from "solana-token-extension-boost";
 import { Connection, PublicKey, Commitment, ConnectionConfig, Transaction } from "@solana/web3.js";
 import { pinJSONToIPFS, pinFileToIPFS, ipfsToHTTP, pinImageFromBase64 } from "@/lib/utils/pinata";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -6,6 +6,10 @@ import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
+import { getUserTokens, TokenItem } from "./tokenList";
+import { getUserTransactions, TransactionItem } from "./transaction-service";
+import { saveTokensToCache } from "../utils/token-cache";
+import { toast } from "sonner";
 
 
 // Interface cho token data
@@ -239,11 +243,27 @@ export async function createToken(
     if (extensionId === "transfer-fees" && tokenData.extensionOptions?.["transfer-fees"]) {
       const feePercentage = parseFloat(tokenData.extensionOptions["transfer-fees"]["fee-percentage"] || "1");
       const feeBasisPoints = feePercentage * 100; // Chuyển đổi % thành basis points
-      const maxFee = BigInt(1000000000); // 1 token với 9 decimals
+      
+      // Lấy maxFee từ input người dùng hoặc sử dụng giá trị mặc định
+      let maxFeeValue: bigint;
+      
+      if (tokenData.extensionOptions["transfer-fees"]["max-fee"]) {
+        // Lấy giá trị từ input
+        const maxFeeInput = tokenData.extensionOptions["transfer-fees"]["max-fee"];
+        
+        // Chuyển đổi thành số thực
+        const maxFeeAmount = parseFloat(maxFeeInput);
+        
+        // Chuyển đổi thành lamports dựa trên decimals
+        maxFeeValue = BigInt(Math.floor(maxFeeAmount * Math.pow(10, decimals)));
+      } else {
+        // Giá trị mặc định: 1 token
+        maxFeeValue = BigInt(Math.pow(10, decimals));
+      }
       
       tokenBuilder.addTransferFee(
         feeBasisPoints,
-        maxFee,
+        maxFeeValue,
         wallet.publicKey,
         wallet.publicKey
       );
@@ -280,12 +300,32 @@ export async function createToken(
   
   // BƯỚC 8.3: Tạo mintTo instructions
   // Khởi tạo đối tượng TransferFeeToken để tạo instructions cho mint
+  
+  // Tính toán feeBasisPoints và maxFeeValue
+  let feeBasisPoints = 0;
+  let maxFeeValue = BigInt(0);
+  
+  if (selectedExtensions.includes("transfer-fees") && tokenData.extensionOptions?.["transfer-fees"]) {
+    // Lấy feeBasisPoints
+    const feePercentage = parseFloat(tokenData.extensionOptions["transfer-fees"]["fee-percentage"] || "1");
+    feeBasisPoints = feePercentage * 100;
+    
+    // Lấy maxFee
+    if (tokenData.extensionOptions["transfer-fees"]["max-fee"]) {
+      const maxFeeInput = tokenData.extensionOptions["transfer-fees"]["max-fee"];
+      const maxFeeAmount = parseFloat(maxFeeInput);
+      maxFeeValue = BigInt(Math.floor(maxFeeAmount * Math.pow(10, decimals)));
+    } else {
+      maxFeeValue = BigInt(Math.pow(10, decimals)); // Mặc định: 1 token
+    }
+  }
+  
   const token = new TransferFeeToken(
     connection, 
     mint,
     {
-      feeBasisPoints: selectedExtensions.includes("transfer-fees") ? 100 : 0,
-      maxFee: BigInt(1_000_000_000),
+      feeBasisPoints: feeBasisPoints,
+      maxFee: maxFeeValue,
       transferFeeConfigAuthority: wallet.publicKey,
       withdrawWithheldAuthority: wallet.publicKey
     }
@@ -436,5 +476,311 @@ export async function createToken(
         throw new Error("Combined transaction failed. Please try again with separate transactions.");
       }
     }
+  }
+}
+
+interface FetchTokensOptions {
+  forceRefresh?: boolean;
+  onStart?: () => void;
+  onSuccess?: (tokens: TokenItem[], totalValue: string) => void;
+  onError?: (error: Error) => void;
+  onFinish?: () => void;
+}
+
+/**
+ * Hàm fetch token từ blockchain
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param options Các tùy chọn
+ * @returns Danh sách tokens hoặc null nếu có lỗi
+ */
+export const fetchTokensFromBlockchain = async (
+  connection: Connection, 
+  wallet: WalletContextState,
+  options: FetchTokensOptions = {}
+): Promise<TokenItem[] | null> => {
+  const { forceRefresh = false, onStart, onSuccess, onError, onFinish } = options;
+  const { publicKey } = wallet;
+  
+  if (!publicKey || !connection) return null;
+  
+  try {
+    if (onStart) onStart();
+    
+    // Fetch tokens from blockchain
+    const userTokens = await getUserTokens(connection, wallet);
+    
+    // Sort tokens by balance (largest first)
+    userTokens.sort((a, b) => {
+      const balanceA = parseFloat(a.balance) || 0;
+      const balanceB = parseFloat(b.balance) || 0;
+      return balanceB - balanceA;
+    });
+    
+    // Calculate total value (if price data is available)
+    const total = userTokens.reduce((acc, token) => {
+      if (token.price) {
+        const price = parseFloat(token.price.replace('$', '')) || 0;
+        const balance = parseFloat(token.balance) || 0;
+        return acc + (price * balance);
+      }
+      return acc;
+    }, 0);
+    
+    const formattedTotal = total.toLocaleString('en-US', { 
+      style: 'currency', 
+      currency: 'USD',
+      maximumFractionDigits: 2
+    });
+    
+    // Cache the fetched data
+    saveTokensToCache(userTokens, formattedTotal, publicKey.toString());
+    
+    if (onSuccess) onSuccess(userTokens, formattedTotal);
+    
+    return userTokens;
+  } catch (error) {
+    console.error("Error fetching tokens:", error);
+    if (onError && error instanceof Error) onError(error);
+    toast.error("Failed to fetch token data");
+    return null;
+  } finally {
+    if (onFinish) onFinish();
+  }
+};
+
+interface FetchTransactionsOptions {
+  limit?: number;
+  onStart?: () => void;
+  onSuccess?: (transactions: TransactionItem[]) => void;
+  onError?: (error: Error) => void;
+  onFinish?: () => void;
+}
+
+/**
+ * Hàm lấy dữ liệu giao dịch gần đây từ blockchain
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param options Các tùy chọn
+ * @returns Danh sách giao dịch hoặc mảng rỗng nếu có lỗi
+ */
+export const fetchRecentTransactions = async (
+  connection: Connection,
+  wallet: WalletContextState,
+  options: FetchTransactionsOptions = {}
+): Promise<TransactionItem[]> => {
+  const { limit = 15, onStart, onSuccess, onError, onFinish } = options;
+  const { publicKey } = wallet;
+  
+  if (!publicKey || !connection) return [];
+  
+  try {
+    if (onStart) onStart();
+    
+    // Gọi service để lấy dữ liệu giao dịch thật từ blockchain
+    const transactionData = await getUserTransactions(connection, wallet, limit);
+    
+    if (onSuccess) onSuccess(transactionData);
+    
+    return transactionData;
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    if (onError && error instanceof Error) onError(error);
+    toast.error("Failed to load recent transactions");
+    return [];
+  } finally {
+    if (onFinish) onFinish();
+  }
+};
+
+/**
+ * Mint thêm token vào lượng cung lưu hành
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param mintAddress Địa chỉ mint của token
+ * @param amount Số lượng token muốn mint (số thực)
+ * @param decimals Số chữ số thập phân của token
+ * @returns Chữ ký giao dịch
+ */
+export async function mintToken(
+  connection: Connection,
+  wallet: WalletContextState,
+  mintAddress: string,
+  amount: string | number,
+  decimals: number,
+  recipientAddress?: string
+): Promise<string> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+  
+  // Chuyển đổi địa chỉ mint thành PublicKey
+  const mintPublicKey = new PublicKey(mintAddress);
+  
+  // Tính toán số lượng token để mint với decimals
+  const amountValue = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const mintAmount = BigInt(Math.floor(amountValue * Math.pow(10, decimals)));
+  
+  // Kiểm tra xem token có phải là token-2022 không
+  const mintInfo = await connection.getAccountInfo(mintPublicKey);
+  if (!mintInfo) {
+    throw new Error("Token mint not found");
+  }
+  
+  const isToken2022 = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
+  
+  // Xác định địa chỉ người nhận
+  const recipient = recipientAddress 
+    ? new PublicKey(recipientAddress)
+    : wallet.publicKey;
+  
+  // Kiểm tra các extension của token và khởi tạo đúng loại token
+  try {
+    // Nếu là token-2022 với TransferFee
+    // Sử dụng TransferFeeToken để tạo instructions
+    const transferFeeConfig = {
+      feeBasisPoints: 0, // Giá trị mặc định, sẽ không ảnh hưởng nếu token không có transfer fee
+      maxFee: BigInt(0),
+      transferFeeConfigAuthority: wallet.publicKey,
+      withdrawWithheldAuthority: wallet.publicKey
+    };
+    
+    const token = new TransferFeeToken(
+      connection,
+      mintPublicKey,
+      transferFeeConfig
+    );
+    
+    // Tạo instructions để mint token
+    const { instructions, address: tokenAccount } = await token.createAccountAndMintToInstructions(
+      recipient,            // owner của token account (người nhận)
+      wallet.publicKey,     // payer (người trả phí)
+      mintAmount,           // số lượng token
+      wallet.publicKey      // mint authority
+    );
+    
+    // Tạo và gửi transaction
+    const transaction = new Transaction();
+    
+    // Lấy blockhash mới
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = wallet.publicKey;
+    
+    // Thêm các instructions
+    instructions.forEach(ix => transaction.add(ix));
+    
+    // Gửi transaction
+    const signature = await wallet.sendTransaction(
+      transaction,
+      connection,
+      { skipPreflight: false, preflightCommitment: 'confirmed' }
+    );
+    
+    // Chờ transaction hoàn thành
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature
+    }, 'confirmed');
+    
+    return signature;
+  } catch (error) {
+    console.error("Error minting token:", error);
+    throw error;
+  }
+}
+
+/**
+ * Đốt token (burn)
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param mintAddress Địa chỉ mint của token
+ * @param amount Số lượng token muốn đốt (số thực)
+ * @param decimals Số chữ số thập phân của token
+ * @returns Chữ ký giao dịch
+ */
+export async function burnToken(
+  connection: Connection,
+  wallet: WalletContextState,
+  mintAddress: string,
+  amount: string | number,
+  decimals: number
+): Promise<string> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+  
+  // Chuyển đổi địa chỉ mint thành PublicKey
+  const mintPublicKey = new PublicKey(mintAddress);
+  
+  // Tính toán số lượng token để burn với decimals
+  const amountValue = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const burnAmount = BigInt(Math.floor(amountValue * Math.pow(10, decimals)));
+  
+  // Kiểm tra xem token có phải là token-2022 không
+  const mintInfo = await connection.getAccountInfo(mintPublicKey);
+  if (!mintInfo) {
+    throw new Error("Token mint not found");
+  }
+  
+  const isToken2022 = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
+  const programId = isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  
+  try {
+    // Lấy token account của người dùng
+    const tokenAccounts = await connection.getTokenAccountsByOwner(
+      wallet.publicKey,
+      { mint: mintPublicKey }
+    );
+    
+    // Kiểm tra xem có token account không
+    if (tokenAccounts.value.length === 0) {
+      throw new Error("Không tìm thấy token account cho token này");
+    }
+    
+    // Chọn token account đầu tiên
+    const tokenAccount = tokenAccounts.value[0].pubkey;
+    
+    // Sử dụng Token để tạo instructions burn
+    const token = new Token(connection, mintPublicKey);
+    
+    // Tạo instruction để burn token
+    const { instructions } = token.createBurnInstructions(
+      tokenAccount,         // token account để burn
+      wallet.publicKey,     // authority
+      burnAmount,           // số lượng token
+      decimals              // số chữ số thập phân
+    );
+    
+    // Tạo và gửi transaction
+    const transaction = new Transaction();
+    
+    // Lấy blockhash mới
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = wallet.publicKey;
+    
+    // Thêm các instructions
+    instructions.forEach(ix => transaction.add(ix));
+    
+    // Gửi transaction
+    const signature = await wallet.sendTransaction(
+      transaction,
+      connection,
+      { skipPreflight: false, preflightCommitment: 'confirmed' }
+    );
+    
+    // Chờ transaction hoàn thành
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature
+    }, 'confirmed');
+    
+    return signature;
+  } catch (error) {
+    console.error("Error burning token:", error);
+    throw error;
   }
 }

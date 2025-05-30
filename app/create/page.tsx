@@ -151,6 +151,13 @@ const tokenExtensions: TokenExtensionType[] = [
     options: [
       { id: "fee-percentage", label: "Fee Percentage", type: "slider", min: 0, max: 10, step: 0.1, defaultValue: 1 },
       { 
+        id: "max-fee", 
+        label: "Maximum Fee (tokens)", 
+        type: "text", 
+        placeholder: "Enter maximum fee per transaction (e.g. 1.0)",
+        required: true
+      },
+      { 
         id: "fee-receiver", 
         label: "Fee Receiver Address", 
         type: "text", 
@@ -381,7 +388,9 @@ export default function CreateToken() {
                 ...prev.extensionOptions,
                 "transfer-fees": {
                   ...(prev.extensionOptions["transfer-fees"] || {}),
-                  "fee-percentage": (feePercentageOption as SliderOptionType).defaultValue
+                  "fee-percentage": (feePercentageOption as SliderOptionType).defaultValue,
+                  "max-fee": "1.0",
+                  "fee-receiver": ""
                 }
               }
             }));
@@ -584,6 +593,25 @@ export default function CreateToken() {
               errors[extensionId] = {
                 ...(errors[extensionId] || {}),
                 "fee-receiver": validation.message || "Fee receiver address is invalid"
+              };
+              isValid = false;
+            }
+          }
+          
+          // Kiểm tra max-fee
+          const maxFee = tokenData.extensionOptions[extensionId]?.["max-fee"];
+          if (!maxFee || (typeof maxFee === 'string' && maxFee.trim() === '')) {
+            errors[extensionId] = {
+              ...(errors[extensionId] || {}),
+              "max-fee": "Maximum fee is required"
+            };
+            isValid = false;
+          } else {
+            const maxFeeValue = Number(maxFee);
+            if (isNaN(maxFeeValue) || maxFeeValue <= 0) {
+              errors[extensionId] = {
+                ...(errors[extensionId] || {}),
+                "max-fee": "Maximum fee must be greater than 0"
               };
               isValid = false;
             }

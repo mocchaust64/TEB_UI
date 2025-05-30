@@ -15,38 +15,31 @@ import {
   Loader2,
   RefreshCw,
   Clock,
-  ArrowUpRight,
-  ArrowDownLeft,
   ExternalLink,
-  ChevronLeft,
-  ChevronRight
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { useWallet, useConnection } from "@solana/wallet-adapter-react"
-import { getUserTokens, TokenItem } from "@/lib/services/tokenList"
+import { TokenItem } from "@/lib/services/tokenList"
 import { toast } from "sonner"
 import { WalletButton } from "@/components/wallet-button"
 import { Badge } from "@/components/ui/badge"
-import { getUserTransactions, TransactionItem } from "@/lib/services/transaction-service"
-
-// Đặt key cho localStorage và thời gian cache (5 phút)
-const TOKENS_STORAGE_KEY = 'tokenui-cached-tokens'
-const CACHE_EXPIRY_TIME = 5 * 60 * 1000 // 5 phút tính bằng mili-giây
-
-// Interface cho dữ liệu được cache
-interface CachedTokenData {
-  tokens: TokenItem[]
-  publicKey: string
-  timestamp: number
-  totalValue: string
-}
+import { TransactionItem } from "@/lib/services/transaction-service"
+import { formatMintAddress, formatTokenBalance } from "@/lib/utils/format-utils"
+import { getTokensFromCache } from "@/lib/utils/token-cache"
+import { fetchTokensFromBlockchain, fetchRecentTransactions } from "@/lib/services/token-service"
+import { TokenItem as TokenItemComponent } from "@/components/token/token-item"
+import { TransactionItem as TransactionItemComponent } from "@/components/transaction/transaction-item"
+import { PaginationControls } from "@/components/pagination/pagination-controls"
+import { useTokenSearch } from "@/hooks/use-token-search"
+import { usePagination } from "@/hooks/use-pagination"
+import { TransactionType } from "@/components/transaction/transaction-icons"
 
 // Interface cho giao dịch
 interface Transaction {
   id: string;
-  type: 'receive' | 'send' | 'swap' | 'mint' | 'burn';
+  type: TransactionType;
   amount: string;
   symbol: string;
   address: string;
@@ -59,9 +52,7 @@ export default function TokenPortfolio() {
   // Fix hydration mismatch by ensuring component
   // always renders consistently between server and client
   const [mounted, setMounted] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
   const [tokens, setTokens] = useState<TokenItem[]>([])
-  const [filteredTokens, setFilteredTokens] = useState<TokenItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
   const [totalValue, setTotalValue] = useState("0")
@@ -69,152 +60,35 @@ export default function TokenPortfolio() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
+  const [displayedTransactions, setDisplayedTransactions] = useState(5) // Số giao dịch hiển thị
   
   // Phân trang
-  const [currentPage, setCurrentPage] = useState(1)
   const [tokensPerPage] = useState(5)
-  const [paginatedTokens, setPaginatedTokens] = useState<TokenItem[]>([])
-  const [totalPages, setTotalPages] = useState(1)
   
   // Get wallet and connection
   const wallet = useWallet()
   const { publicKey, connected } = wallet
   const { connection } = useConnection()
   
+  // Sử dụng hooks đã tách
+  const { searchTerm, setSearchTerm, filteredTokens } = useTokenSearch({ tokens });
+  const { 
+    currentPage, 
+    setCurrentPage, 
+    paginatedItems: paginatedTokens, 
+    totalPages,
+    goToPreviousPage,
+    goToNextPage,
+    pageNumbers
+  } = usePagination<TokenItem>({
+    items: filteredTokens,
+    itemsPerPage: tokensPerPage
+  });
+  
   // Setup mounting state
   useEffect(() => {
     setMounted(true)
   }, [])
-  
-  // Hàm lưu dữ liệu token vào localStorage
-  const saveTokensToCache = (tokenData: TokenItem[], totalValue: string) => {
-    if (!publicKey) return
-
-    const cacheData: CachedTokenData = {
-      tokens: tokenData,
-      publicKey: publicKey.toString(),
-      timestamp: Date.now(),
-      totalValue
-    }
-
-    try {
-      localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(cacheData))
-    } catch (error) {
-      console.error("Error saving tokens to cache:", error)
-    }
-  }
-
-  // Hàm đọc dữ liệu token từ localStorage
-  const getTokensFromCache = (): CachedTokenData | null => {
-    if (!publicKey) return null
-
-    try {
-      const cachedData = localStorage.getItem(TOKENS_STORAGE_KEY)
-      if (!cachedData) return null
-
-      const parsedData: CachedTokenData = JSON.parse(cachedData)
-      
-      // Kiểm tra xem dữ liệu có thuộc về ví hiện tại không
-      if (parsedData.publicKey !== publicKey.toString()) return null
-      
-      // Kiểm tra xem dữ liệu có hết hạn không
-      if (Date.now() - parsedData.timestamp > CACHE_EXPIRY_TIME) return null
-      
-      return parsedData
-    } catch (error) {
-      console.error("Error reading tokens from cache:", error)
-      return null
-    }
-  }
-
-  // Hàm fetch token từ blockchain
-  const fetchTokensFromBlockchain = async (forceRefresh = false) => {
-    if (!publicKey || !connection) return
-    
-    try {
-      setIsLoading(true)
-      setIsError(false)
-      if (forceRefresh) setIsRefreshing(true)
-      
-      // Fetch tokens from blockchain
-      const userTokens = await getUserTokens(connection, wallet)
-      
-      // Sort tokens by balance (largest first)
-      userTokens.sort((a, b) => {
-        const balanceA = parseFloat(a.balance) || 0
-        const balanceB = parseFloat(b.balance) || 0
-        return balanceB - balanceA
-      })
-      
-      setTokens(userTokens)
-      setFilteredTokens(userTokens)
-      
-      // Calculate total value (if price data is available)
-      const total = userTokens.reduce((acc, token) => {
-        if (token.price) {
-          const price = parseFloat(token.price.replace('$', '')) || 0
-          const balance = parseFloat(token.balance) || 0
-          return acc + (price * balance)
-        }
-        return acc
-      }, 0)
-      
-      const formattedTotal = total.toLocaleString('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        maximumFractionDigits: 2
-      })
-      
-      setTotalValue(formattedTotal)
-      setLastUpdated(new Date())
-      
-      // Cache the fetched data
-      saveTokensToCache(userTokens, formattedTotal)
-      
-      return userTokens
-    } catch (error) {
-      console.error("Error fetching tokens:", error)
-      setIsError(true)
-      toast.error("Failed to fetch token data")
-      return null
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
-    }
-  }
-  
-  // Hàm lấy dữ liệu giao dịch gần đây từ blockchain
-  const fetchRecentTransactions = async () => {
-    if (!publicKey || !connection) return
-    
-    try {
-      setIsLoadingTransactions(true)
-      
-      // Gọi service để lấy dữ liệu giao dịch thật từ blockchain
-      const transactionData = await getUserTransactions(connection, wallet, 10)
-      
-      // Chuyển đổi từ TransactionItem sang Transaction
-      const transactions: Transaction[] = transactionData.map(tx => ({
-        id: tx.id,
-        type: tx.type,
-        amount: tx.amount,
-        symbol: tx.symbol,
-        address: tx.address,
-        timestamp: tx.timestamp,
-        status: tx.status === 'confirmed' ? 'confirmed' : 
-                tx.status === 'processing' ? 'processing' : 'failed',
-        tokenIcon: tx.tokenIcon
-      }))
-      
-      setRecentTransactions(transactions)
-      
-    } catch (error) {
-      console.error("Error fetching transactions:", error)
-      toast.error("Failed to load recent transactions")
-    } finally {
-      setIsLoadingTransactions(false)
-    }
-  };
   
   // Fetch tokens when wallet connects
   useEffect(() => {
@@ -222,165 +96,130 @@ export default function TokenPortfolio() {
     
     const loadTokens = async () => {
       // Try to get data from cache first
-      const cachedData = getTokensFromCache()
+      const cachedData = getTokensFromCache(publicKey.toString())
       
       if (cachedData) {
         // Use cached data
         setTokens(cachedData.tokens)
-        setFilteredTokens(cachedData.tokens)
         setTotalValue(cachedData.totalValue)
         setLastUpdated(new Date(cachedData.timestamp))
         
         // Optional: Fetch fresh data in the background
-        fetchTokensFromBlockchain(false)
+        fetchTokensFromBlockchain(connection, wallet, {
+          onStart: () => {
+            // Do nothing, we're using cached data initially
+          }
+        })
       } else {
         // No valid cache, fetch from blockchain
-        await fetchTokensFromBlockchain(false)
+        await fetchTokensFromBlockchain(connection, wallet, {
+          onStart: () => {
+            setIsLoading(true)
+            setIsError(false)
+          },
+          onSuccess: (userTokens, formattedTotal) => {
+            setTokens(userTokens)
+            setTotalValue(formattedTotal)
+            setLastUpdated(new Date())
+          },
+          onError: () => {
+            setIsError(true)
+          },
+          onFinish: () => {
+            setIsLoading(false)
+          }
+        })
       }
     }
     
     loadTokens()
-    fetchRecentTransactions()
+    
+    fetchRecentTransactions(connection, wallet, {
+      onStart: () => {
+        setIsLoadingTransactions(true)
+      },
+      onSuccess: (transactionData) => {
+        // Chuyển đổi từ TransactionItem sang Transaction
+        const transactions: Transaction[] = transactionData.map(tx => ({
+          id: tx.id,
+          type: tx.type as TransactionType,
+          amount: tx.amount,
+          symbol: tx.symbol,
+          address: tx.address,
+          timestamp: tx.timestamp,
+          status: tx.status === 'confirmed' ? 'confirmed' : 
+                 tx.status === 'processing' ? 'processing' : 'failed',
+          tokenIcon: tx.tokenIcon
+        }))
+        
+        setRecentTransactions(transactions)
+      },
+      onFinish: () => {
+        setIsLoadingTransactions(false)
+      }
+    })
   }, [mounted, connected, publicKey, connection, wallet])
-  
-  // Filter tokens when search term changes
-  useEffect(() => {
-    if (!mounted) return
-    
-    if (searchTerm.trim() === '') {
-      setFilteredTokens(tokens)
-    } else {
-      const term = searchTerm.toLowerCase()
-      setFilteredTokens(tokens.filter(token => 
-        token.name.toLowerCase().includes(term) || 
-        token.symbol.toLowerCase().includes(term)
-      ))
-    }
-  }, [searchTerm, tokens, mounted])
-  
-  // Tính toán phân trang khi tokens hoặc trang hiện tại thay đổi
-  useEffect(() => {
-    if (!mounted) return
-    
-    // Tính toán số trang
-    const total = Math.ceil(filteredTokens.length / tokensPerPage)
-    setTotalPages(total || 1) // Tối thiểu là 1 trang
-    
-    // Điều chỉnh trang hiện tại nếu vượt quá số trang
-    if (currentPage > total && total > 0) {
-      setCurrentPage(1)
-    }
-    
-    // Lấy token cho trang hiện tại
-    const startIndex = (currentPage - 1) * tokensPerPage
-    const endIndex = startIndex + tokensPerPage
-    setPaginatedTokens(filteredTokens.slice(startIndex, endIndex))
-    
-  }, [filteredTokens, currentPage, tokensPerPage, mounted])
-  
-  // Di chuyển đến trang trước
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(prev => prev - 1)
-    }
-  }
-  
-  // Di chuyển đến trang tiếp theo
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(prev => prev + 1)
-    }
-  }
-  
-  // Hiển thị các trang xung quanh trang hiện tại
-  const getPageNumbers = () => {
-    const pageNumbers = []
-    const maxPagesToShow = 5 // Tối đa số trang hiển thị
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2))
-    let endPage = startPage + maxPagesToShow - 1
-    
-    if (endPage > totalPages) {
-      endPage = totalPages
-      startPage = Math.max(1, endPage - maxPagesToShow + 1)
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i)
-    }
-    
-    return pageNumbers
-  }
   
   // Handler to manually refresh token data
   const handleRefresh = () => {
-    fetchTokensFromBlockchain(true)
-    fetchRecentTransactions()
+    if (!connection || !wallet) return;
+    
+    fetchTokensFromBlockchain(connection, wallet, {
+      forceRefresh: true,
+      onStart: () => {
+        setIsRefreshing(true)
+      },
+      onSuccess: (userTokens, formattedTotal) => {
+        setTokens(userTokens)
+        setTotalValue(formattedTotal)
+        setLastUpdated(new Date())
+      },
+      onError: () => {
+        toast.error("Failed to refresh token data")
+      },
+      onFinish: () => {
+        setIsRefreshing(false)
+      }
+    })
+    
+    fetchRecentTransactions(connection, wallet, {
+      onStart: () => {
+        setIsLoadingTransactions(true)
+      },
+      onSuccess: (transactionData) => {
+        const transactions: Transaction[] = transactionData.map(tx => ({
+          id: tx.id,
+          type: tx.type as TransactionType,
+          amount: tx.amount,
+          symbol: tx.symbol,
+          address: tx.address,
+          timestamp: tx.timestamp,
+          status: tx.status === 'confirmed' ? 'confirmed' : 
+                 tx.status === 'processing' ? 'processing' : 'failed',
+          tokenIcon: tx.tokenIcon
+        }))
+        
+        setRecentTransactions(transactions)
+      },
+      onFinish: () => {
+        setIsLoadingTransactions(false)
+      }
+    })
   }
+  
+  // Hàm để xem thêm hoặc thu gọn giao dịch
+  const toggleTransactionsDisplay = () => {
+    if (displayedTransactions === 5) {
+      setDisplayedTransactions(recentTransactions.length); // Hiển thị tất cả
+    } else {
+      setDisplayedTransactions(5); // Thu gọn về 5
+    }
+  };
   
   // Show loading skeleton until component mounted on client
   if (!mounted) {
     return <PageLoadingSkeleton />
   }
-
-  // Hàm hiển thị icon cho loại giao dịch
-  const getTransactionIcon = (type: Transaction['type']) => {
-    switch (type) {
-      case 'receive':
-        return <ArrowDownLeft className="w-4 h-4 text-green-500" />;
-      case 'send':
-        return <ArrowUpRight className="w-4 h-4 text-red-500" />;
-      case 'swap':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-            <path d="M17 3v10" />
-            <path d="m21 7-4-4-4 4" />
-            <path d="M7 21v-10" />
-            <path d="m3 17 4 4 4-4" />
-          </svg>
-        );
-      case 'mint':
-        return <Plus className="w-4 h-4 text-purple-500" />;
-      case 'burn':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500">
-            <path d="M12 2v8" />
-            <path d="m4.93 10.93 1.41 1.41" />
-            <path d="M2 18h2" />
-            <path d="M20 18h2" />
-            <path d="m19.07 10.93-1.41 1.41" />
-            <path d="M22 22H2" />
-            <path d="m16 6-4 4-4-4" />
-            <path d="M16 18a4 4 0 0 0-8 0" />
-          </svg>
-        );
-      default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
-    }
-  };
-  
-  // Hàm định dạng địa chỉ rút gọn
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  };
-  
-  // Hàm định dạng thời gian giao dịch
-  const formatTimestamp = (timestamp: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
-    const diffMins = Math.floor(diffMs / (60 * 1000));
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 30) return `${diffDays}d ago`;
-    
-    return timestamp.toLocaleDateString();
-  };
 
   return (
     <CommonLayout>
@@ -569,92 +408,19 @@ export default function TokenPortfolio() {
                         <div>
                 <div className="grid grid-cols-1 gap-4">
                             {paginatedTokens.map((token) => (
-                    <Link href={`/tokens/${token.id}`} key={token.id}>
-                      <Card className="bg-gray-900/50 border-gray-700 hover:border-purple-500/50 transition-colors cursor-pointer">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center mr-3">
-                                          {token.image ? (
-                                            <img 
-                                              src={token.image}
-                                              alt={token.name}
-                                              className="w-full h-full object-cover"
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center">
-                                <span className="text-white font-bold">{token.symbol.charAt(0)}</span>
-                                            </div>
-                                          )}
-                              </div>
-                              <div>
-                                <h3 className="text-white font-medium">{token.name}</h3>
-                                <div className="flex items-center">
-                                  <span className="text-sm text-gray-400 mr-2">{token.symbol}</span>
-                                  <span className="text-xs px-1.5 py-0.5 bg-gray-800 text-gray-300 rounded">
-                                              {parseFloat(token.balance).toLocaleString()} {token.symbol}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="text-right">
-                                        {token.value && (
-                              <div className="text-white font-medium">{token.value}</div>
-                                        )}
-                                        {token.price && (
-                              <div className={`text-sm flex items-center justify-end ${token.positive ? 'text-green-400' : 'text-red-400'}`}>
-                                {token.price}
-                                            {token.change && <span className="ml-2">{token.change}</span>}
-                              </div>
-                                        )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                              <TokenItemComponent key={token.id} token={token} />
                   ))}
                           </div>
                           
                           {/* Điều khiển phân trang */}
-                          <div className="flex items-center justify-between mt-6 text-sm">
-                            <div className="text-gray-400">
-                              Showing {Math.min(filteredTokens.length, (currentPage - 1) * tokensPerPage + 1)}-{Math.min(filteredTokens.length, currentPage * tokensPerPage)} of {filteredTokens.length} tokens
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Button 
-                                variant="outline" 
-                                size="icon" 
-                                className="w-8 h-8 p-0 border-gray-700"
-                                onClick={goToPreviousPage} 
-                                disabled={currentPage === 1}
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                              </Button>
-                              
-                              {getPageNumbers().map(pageNumber => (
-                                <Button 
-                                  key={pageNumber}
-                                  variant={pageNumber === currentPage ? "default" : "outline"} 
-                                  size="icon" 
-                                  className={`w-8 h-8 p-0 ${pageNumber === currentPage ? 'bg-purple-600 border-purple-600' : 'border-gray-700'}`}
-                                  onClick={() => setCurrentPage(pageNumber)}
-                                >
-                                  {pageNumber}
-                                </Button>
-                              ))}
-                              
-                              <Button 
-                                variant="outline" 
-                                size="icon" 
-                                className="w-8 h-8 p-0 border-gray-700"
-                                onClick={goToNextPage} 
-                                disabled={currentPage === totalPages}
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
+                          <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                            totalItems={filteredTokens.length}
+                            itemsPerPage={tokensPerPage}
+                            itemName="tokens"
+                          />
                 </div>
               ) : (
                 <Card className="bg-gray-900/50 border-gray-700">
@@ -708,7 +474,18 @@ export default function TokenPortfolio() {
                 <div className="lg:col-span-1">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-white">Recent Activity</h2>
-                    <Button variant="ghost" size="sm" onClick={() => fetchRecentTransactions()}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        if (connection && wallet) {
+                          fetchRecentTransactions(connection, wallet, {
+                            onStart: () => setIsLoadingTransactions(true),
+                            onFinish: () => setIsLoadingTransactions(false)
+                          });
+                        }
+                      }}
+                    >
                       <RefreshCw className={`w-4 h-4 text-gray-400 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
@@ -725,43 +502,30 @@ export default function TokenPortfolio() {
                         </div>
                       ) : recentTransactions.length > 0 ? (
                         <div className="divide-y divide-gray-800">
-                          {recentTransactions.map((tx) => (
-                            <div key={tx.id} className="p-4 hover:bg-gray-800/30">
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center">
-                                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-800 mr-3">
-                                    {getTransactionIcon(tx.type)}
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center">
-                                      <span className="text-white font-medium mr-2 capitalize">
-                                        {tx.type}
-                                      </span>
-                                      <Badge variant="outline" className="text-xs px-1.5 border-gray-700 text-gray-400">
-                                        {tx.status}
-                                      </Badge>
-                                    </div>
-                                    <div className="text-sm text-gray-400 mt-0.5">
-                                      {formatAddress(tx.address)}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`font-medium ${tx.type === 'receive' || tx.type === 'mint' ? 'text-green-400' : tx.type === 'send' || tx.type === 'burn' ? 'text-red-400' : 'text-blue-400'}`}>
-                                    {tx.type === 'receive' || tx.type === 'mint' ? '+' : tx.type === 'send' || tx.type === 'burn' ? '-' : ''}{tx.amount} {tx.symbol}
-                                  </div>
-                                  <div className="text-xs text-gray-400 mt-0.5">
-                                    {formatTimestamp(tx.timestamp)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                          {recentTransactions.slice(0, displayedTransactions).map((tx) => (
+                            <TransactionItemComponent
+                              key={tx.id}
+                              id={tx.id}
+                              type={tx.type}
+                              amount={tx.amount}
+                              symbol={tx.symbol}
+                              address={tx.address}
+                              timestamp={tx.timestamp}
+                              status={tx.status}
+                              tokenIcon={tx.tokenIcon}
+                            />
                           ))}
                           
                           <div className="p-4 text-center">
-                            <Button variant="link" size="sm" className="text-purple-400">
-                              View all transactions
-                              <ExternalLink className="w-3 h-3 ml-1" />
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="text-purple-400"
+                              onClick={recentTransactions.length > 5 ? toggleTransactionsDisplay : undefined}
+                            >
+                              {recentTransactions.length <= 5 ? "View all transactions" : 
+                               displayedTransactions === 5 ? `Show all (${recentTransactions.length})` : "Show less"}
+                              {displayedTransactions === 5 && <ExternalLink className="w-3 h-3 ml-1" />}
                             </Button>
                           </div>
                         </div>
