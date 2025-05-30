@@ -14,10 +14,10 @@ interface UseTokenSearchResult {
 }
 
 /**
- * Hook tìm kiếm và lọc token
- * @param tokens Danh sách tokens gốc
- * @param initialSearchTerm Từ khóa tìm kiếm ban đầu (mặc định là '')
- * @returns Từ khóa tìm kiếm, hàm set từ khóa, danh sách tokens đã được lọc
+ * Hook for searching and filtering tokens
+ * @param tokens Original token list
+ * @param initialSearchTerm Initial search term (default is '')
+ * @returns Search term, set term function, filtered token list
  */
 export const useTokenSearch = ({ 
   tokens, 
@@ -26,7 +26,7 @@ export const useTokenSearch = ({
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [filteredTokens, setFilteredTokens] = useState<TokenItem[]>(tokens);
 
-  // Cập nhật kết quả tìm kiếm khi searchTerm hoặc tokens thay đổi
+  // Update search results when searchTerm or tokens change
   useEffect(() => {
     if (searchTerm.trim() === '') {
       setFilteredTokens(tokens);
@@ -40,7 +40,7 @@ export const useTokenSearch = ({
     }
   }, [searchTerm, tokens]);
 
-  // Hàm xóa tìm kiếm
+  // Function to clear search
   const clearSearch = () => {
     setSearchTerm('');
   };

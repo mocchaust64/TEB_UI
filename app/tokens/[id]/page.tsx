@@ -13,10 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "react-hot-toast"
 import {
   Coins,
-  ArrowRight,
   ChevronRight,
   Clock,
-  ExternalLink,
   Send,
   Banknote,
   Flame,
@@ -28,11 +26,10 @@ import {
   X,
   Download,
   Upload,
-  QrCode,
-  Share2,
-  Copy,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw,
+  Copy
 } from "lucide-react"
 import { 
   LineChart, 
@@ -48,8 +45,9 @@ import {
 import { useWallet, useConnection } from "@solana/wallet-adapter-react"
 import { getTokenDetails, TokenDetails } from "@/lib/services/tokenList"
 import { PublicKey } from "@solana/web3.js"
+import { formatAddress } from "@/lib/utils/format-utils"
 
-// Mock dữ liệu biểu đồ giá
+// Mock price chart data
 const priceData = [
   { name: '01/05', price: 0.045, volume: 12000 },
   { name: '05/05', price: 0.042, volume: 15000 },
@@ -65,7 +63,6 @@ export default function TokenDetailsPage() {
   const [mounted, setMounted] = useState(false)
   const [token, setToken] = useState<TokenDetails | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [showQrCode, setShowQrCode] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -73,16 +70,16 @@ export default function TokenDetailsPage() {
   const wallet = useWallet()
   
   useEffect(() => {
-    // Chỉ tải dữ liệu nếu ví đã kết nối
+    // Only load data if wallet is connected
     const loadData = async () => {
       if (!wallet.connected || !wallet.publicKey) {
-        setError("Vui lòng kết nối ví để xem chi tiết token")
+        setError("Please connect your wallet to view token details")
         setIsLoading(false)
         return
       }
       
       if (!params.id) {
-        setError("Không tìm thấy token ID")
+        setError("Token ID not found")
         setIsLoading(false)
         return
       }
@@ -91,17 +88,17 @@ export default function TokenDetailsPage() {
         setIsLoading(true)
         const tokenId = Array.isArray(params.id) ? params.id[0] : params.id
         
-        // Lấy thông tin token từ blockchain
+        // Get token details from blockchain
         const tokenDetails = await getTokenDetails(connection, wallet, tokenId)
         setToken(tokenDetails)
         
-        // Trong trường hợp thực tế, bạn sẽ lấy trạng thái theo dõi từ API hoặc cơ sở dữ liệu
+        // In a real-world scenario, you would get the following status from API or database
         setIsFollowing(false)
         
         setError(null)
       } catch (err) {
-        console.error("Lỗi khi lấy thông tin token:", err)
-        setError("Không thể tải thông tin token. Vui lòng thử lại sau.")
+        console.error("Error getting token details:", err)
+        setError("Unable to load token information. Please try again later.")
       } finally {
         setIsLoading(false)
         setMounted(true)
@@ -112,24 +109,17 @@ export default function TokenDetailsPage() {
   }, [params, connection, wallet, wallet.connected, wallet.publicKey])
 
   const toggleFollowToken = () => {
-    // Trong trường hợp thực tế, bạn sẽ gọi API để cập nhật trạng thái theo dõi
+    // In a real-world scenario, you would call an API to update the following status
     setIsFollowing(!isFollowing)
-    toast.success(isFollowing ? `Đã bỏ theo dõi ${token?.symbol}` : `Đã thêm ${token?.symbol} vào danh sách theo dõi`)
+    toast.success(isFollowing ? `Unfollowed ${token?.symbol}` : `Added ${token?.symbol} to watchlist`)
   }
 
-  const copyWalletAddress = () => {
-    if (wallet.publicKey) {
-      navigator.clipboard.writeText(wallet.publicKey.toString())
-      toast.success('Đã sao chép địa chỉ ví vào clipboard')
-    }
-  }
-  
-  // Hiển thị loading skeleton khi chưa mounted hoặc đang tải
+  // Show loading skeleton when not mounted or loading
   if (!mounted || isLoading) {
     return <PageLoadingSkeleton />
   }
   
-  // Hiển thị thông báo lỗi
+  // Show error message
   if (error) {
     return (
       <CommonLayout>
@@ -138,14 +128,14 @@ export default function TokenDetailsPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Đã xảy ra lỗi</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">An error occurred</h2>
             <p className="text-gray-300 mb-4">{error}</p>
             <Button 
               variant="outline" 
               className="border-red-500 hover:bg-red-500/20 text-white"
               onClick={() => window.location.reload()}
             >
-              Thử lại
+              Try again
             </Button>
           </div>
         </div>
@@ -153,7 +143,7 @@ export default function TokenDetailsPage() {
     )
   }
   
-  // Nếu không tìm thấy token
+  // If token not found
   if (!token) {
     return (
       <CommonLayout>
@@ -162,14 +152,14 @@ export default function TokenDetailsPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
               <AlertCircle className="w-8 h-8 text-yellow-500" />
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Không tìm thấy token</h2>
-            <p className="text-gray-300 mb-4">Token không tồn tại hoặc bạn không có quyền truy cập</p>
+            <h2 className="text-xl font-semibold text-white mb-2">Token not found</h2>
+            <p className="text-gray-300 mb-4">The token doesn't exist or you don't have access to it</p>
             <Link href="/tokens">
               <Button 
                 variant="outline" 
                 className="border-yellow-500 hover:bg-yellow-500/20 text-white"
               >
-                Quay lại danh sách token
+                Back to token list
               </Button>
             </Link>
           </div>
@@ -197,13 +187,13 @@ export default function TokenDetailsPage() {
               <Link href={`/tokens/${token.id}/transfer`}>
                 <Button variant="outline" className="border-gray-700 hover:bg-gray-800 text-white">
                   <Send className="w-4 h-4 mr-2" />
-                  Chuyển
+                  Transfer
                 </Button>
               </Link>
               <Link href={`/tokens/${token.id}/manage`}>
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                   <Settings className="w-4 h-4 mr-2" />
-                  Quản lý
+                  Manage
                 </Button>
               </Link>
             </div>
@@ -235,23 +225,23 @@ export default function TokenDetailsPage() {
                     {isFollowing && (
                       <Badge variant="outline" className="ml-2 bg-yellow-500/10 text-yellow-400 border-yellow-500/30">
                         <Star className="w-3 h-3 mr-1" fill="currentColor" />
-                        Đang theo dõi
+                        Following
                       </Badge>
                     )}
                   </div>
-                  <p className="text-gray-400 mb-4 line-clamp-2">{token.description || `Token ${token.symbol} trên Solana blockchain.`}</p>
+                  <p className="text-gray-400 mb-4 line-clamp-2">{token.description || `${token.symbol} token on Solana blockchain.`}</p>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">Số dư</p>
+                      <p className="text-gray-400 text-sm mb-1">Balance</p>
                       <p className="text-white font-medium">{token.balance} {token.symbol}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">Giá trị</p>
+                      <p className="text-gray-400 text-sm mb-1">Value</p>
                       <p className="text-white font-medium">{token.value || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">Giá</p>
+                      <p className="text-gray-400 text-sm mb-1">Price</p>
                       <div className="flex items-center">
                         <span className="text-white font-medium mr-2">{token.price || 'N/A'}</span>
                         {token.change && (
@@ -262,7 +252,7 @@ export default function TokenDetailsPage() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">Tổng cung</p>
+                      <p className="text-gray-400 text-sm mb-1">Total Supply</p>
                       <p className="text-white font-medium">{token.supply} {token.symbol}</p>
                     </div>
                   </div>
@@ -327,7 +317,7 @@ export default function TokenDetailsPage() {
                     {token.created && (
                       <div className="inline-flex items-center px-3 py-1 rounded-full bg-gray-800 text-gray-300 text-xs">
                         <CalendarClock className="w-3 h-3 mr-1" />
-                        Tạo: {token.created}
+                        Created: {token.created}
                       </div>
                     )}
                   </div>
@@ -339,19 +329,19 @@ export default function TokenDetailsPage() {
               <TabsList className="bg-gray-800/50 border-b border-gray-700 w-full justify-start mb-6">
                 <TabsTrigger value="transactions" className="data-[state=active]:bg-gray-700">
                   <Clock className="w-4 h-4 mr-2" />
-                  Lịch sử giao dịch
+                  Transaction History
                 </TabsTrigger>
                 <TabsTrigger value="chart" className="data-[state=active]:bg-gray-700">
                   <BarChart3 className="w-4 h-4 mr-2" />
-                  Biểu đồ
+                  Chart
                 </TabsTrigger>
               </TabsList>
               
               <TabsContent value="transactions" className="mt-0">
                 <Card className="bg-gray-900/50 border-gray-700">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-white text-lg">Lịch sử giao dịch</CardTitle>
-                    <CardDescription>Các giao dịch gần đây với token {token.symbol}</CardDescription>
+                    <CardTitle className="text-white text-lg">Transaction History</CardTitle>
+                    <CardDescription>Recent transactions with {token.symbol} token</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {token.transactions && token.transactions.length > 0 ? (
@@ -371,7 +361,7 @@ export default function TokenDetailsPage() {
                                 )}
                                 <div>
                                   <p className="text-white font-medium">
-                                    {tx.type === 'receive' ? 'Nhận' : 'Gửi'} {tx.amount} {token.symbol}
+                                    {tx.type === 'receive' ? 'Received' : 'Sent'} {tx.amount} {token.symbol}
                                   </p>
                                   <p className="text-gray-400 text-sm">{tx.date}</p>
                                 </div>
@@ -387,17 +377,17 @@ export default function TokenDetailsPage() {
                                     {tx.status === 'completed' ? (
                                       <>
                                         <Check className="w-3 h-3 mr-1" />
-                                        Thành công
+                                        Completed
                                       </>
                                     ) : tx.status === 'pending' ? (
                                       <>
                                         <Clock className="w-3 h-3 mr-1" />
-                                        Đang xử lý
+                                        Processing
                                       </>
                                     ) : (
                                       <>
                                         <X className="w-3 h-3 mr-1" />
-                                        Thất bại
+                                        Failed
                                       </>
                                     )}
                                   </span>
@@ -407,12 +397,34 @@ export default function TokenDetailsPage() {
                             <div className="bg-gray-900/50 rounded-lg p-3 text-sm">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 <div>
-                                  <span className="text-gray-400">Từ: </span>
-                                  <span className="text-gray-300">{tx.from}</span>
+                                  <span className="text-gray-400">From: </span>
+                                  <span className="text-gray-300 font-mono text-xs">{formatAddress(tx.from)}</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-5 w-5 ml-1 p-0 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(tx.from);
+                                      toast.success('Address copied to clipboard');
+                                    }}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
                                 </div>
                                 <div>
-                                  <span className="text-gray-400">Đến: </span>
-                                  <span className="text-gray-300">{tx.to}</span>
+                                  <span className="text-gray-400">To: </span>
+                                  <span className="text-gray-300 font-mono text-xs">{formatAddress(tx.to)}</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-5 w-5 ml-1 p-0 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(tx.to);
+                                      toast.success('Address copied to clipboard');
+                                    }}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -422,8 +434,8 @@ export default function TokenDetailsPage() {
                     ) : (
                       <div className="flex flex-col items-center justify-center p-8 text-center">
                         <Clock className="w-12 h-12 text-gray-500 mb-3" />
-                        <h3 className="text-white text-lg font-medium mb-1">Chưa có giao dịch nào</h3>
-                        <p className="text-gray-400">Token này chưa có giao dịch nào được ghi nhận</p>
+                        <h3 className="text-white text-lg font-medium mb-1">No transactions yet</h3>
+                        <p className="text-gray-400">This token has no recorded transactions</p>
                       </div>
                     )}
                   </CardContent>
@@ -433,8 +445,8 @@ export default function TokenDetailsPage() {
               <TabsContent value="chart" className="mt-0">
                 <Card className="bg-gray-900/50 border-gray-700">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-white text-lg">Biểu đồ giá {token.symbol}</CardTitle>
-                    <CardDescription>Biến động giá trong 30 ngày qua</CardDescription>
+                    <CardTitle className="text-white text-lg">Price Chart for {token.symbol}</CardTitle>
+                    <CardDescription>Price movement over the last 30 days</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="bg-gray-800/50 rounded-lg p-4">
@@ -445,7 +457,7 @@ export default function TokenDetailsPage() {
                             <span className={token.positive ? "text-green-400" : "text-red-400"}>
                               {token.change || '+0.00%'}
                             </span>
-                            <span className="text-gray-400 text-sm ml-2">30 ngày qua</span>
+                            <span className="text-gray-400 text-sm ml-2">Last 30 days</span>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -495,8 +507,8 @@ export default function TokenDetailsPage() {
                                 color: '#f3f4f6' 
                               }}
                               itemStyle={{ color: '#8884d8' }}
-                              formatter={(value) => [`$${value}`, 'Giá']}
-                              labelFormatter={(value) => `Ngày: ${value}`}
+                              formatter={(value) => [`$${value}`, 'Price']}
+                              labelFormatter={(value) => `Date: ${value}`}
                             />
                             <Area 
                               type="monotone" 
@@ -510,19 +522,19 @@ export default function TokenDetailsPage() {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                         <div className="bg-gray-900/50 p-3 rounded-lg">
-                          <p className="text-gray-400 text-xs mb-1">Giá cao nhất</p>
+                          <p className="text-gray-400 text-xs mb-1">Highest Price</p>
                           <p className="text-white font-medium">$0.052</p>
                         </div>
                         <div className="bg-gray-900/50 p-3 rounded-lg">
-                          <p className="text-gray-400 text-xs mb-1">Giá thấp nhất</p>
+                          <p className="text-gray-400 text-xs mb-1">Lowest Price</p>
                           <p className="text-white font-medium">$0.042</p>
                         </div>
                         <div className="bg-gray-900/50 p-3 rounded-lg">
-                          <p className="text-gray-400 text-xs mb-1">Khối lượng 24h</p>
+                          <p className="text-gray-400 text-xs mb-1">24h Volume</p>
                           <p className="text-white font-medium">42,250 {token.symbol}</p>
                         </div>
                         <div className="bg-gray-900/50 p-3 rounded-lg">
-                          <p className="text-gray-400 text-xs mb-1">Vốn hóa</p>
+                          <p className="text-gray-400 text-xs mb-1">Market Cap</p>
                           <p className="text-white font-medium">$50,000</p>
                         </div>
                       </div>
@@ -543,13 +555,13 @@ export default function TokenDetailsPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-lg flex items-center">
                   <Coins className="w-5 h-5 mr-2" />
-                  Thông tin Token
+                  Token Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Tên:</span>
+                    <span className="text-gray-400">Name:</span>
                     <span className="text-white">{token.name}</span>
                   </div>
                   <div className="flex justify-between">
@@ -561,7 +573,7 @@ export default function TokenDetailsPage() {
                     <span className="text-white">{token.decimals}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Tổng cung:</span>
+                    <span className="text-gray-400">Total Supply:</span>
                     <span className="text-white">{token.supply}</span>
                   </div>
                 </div>
@@ -578,7 +590,7 @@ export default function TokenDetailsPage() {
                               ? 'bg-green-500/20 text-green-400' 
                               : 'bg-gray-600/50 text-gray-400'
                           }`}>
-                            {ext.status === 'active' ? 'Hoạt động' : 'Vô hiệu'}
+                            {ext.status === 'active' ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                         <p className="text-gray-400 text-sm">{ext.details}</p>
@@ -589,114 +601,33 @@ export default function TokenDetailsPage() {
               </CardContent>
             </Card>
             
-            <Card className="bg-gray-900/50 border-gray-700 mb-6">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-lg">Nhận Token</CardTitle>
-                <CardDescription>Chia sẻ địa chỉ ví để nhận token</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                  {showQrCode ? (
-                    <div className="flex flex-col items-center">
-                      <div className="bg-white p-3 rounded-lg mb-3">
-                        <svg
-                          className="w-40 h-40"
-                          viewBox="0 0 200 200"
-                          style={{ width: '100%', height: 'auto' }}
-                        >
-                          <rect width="200" height="200" fill="#FFFFFF" />
-                          <path d="M40,40 L40,70 L70,70 L70,40 L40,40 Z M50,50 L60,50 L60,60 L50,60 L50,50 Z" fill="#000000" />
-                          <path d="M80,40 L80,70 L110,70 L110,40 L80,40 Z M90,50 L100,50 L100,60 L90,60 L90,50 Z" fill="#000000" />
-                          <path d="M120,40 L120,70 L150,70 L150,40 L120,40 Z M130,50 L140,50 L140,60 L130,60 L130,50 Z" fill="#000000" />
-                          <path d="M40,80 L40,110 L70,110 L70,80 L40,80 Z M50,90 L60,90 L60,100 L50,100 L50,90 Z" fill="#000000" />
-                          <path d="M80,80 L80,110 L110,110 L110,80 L80,80 Z M90,90 L100,90 L100,100 L90,100 L90,90 Z" fill="#000000" />
-                          <path d="M120,80 L120,110 L150,110 L150,80 L120,80 Z M130,90 L140,90 L140,100 L130,100 L130,90 Z" fill="#000000" />
-                          <path d="M40,120 L40,150 L70,150 L70,120 L40,120 Z M50,130 L60,130 L60,140 L50,140 L50,130 Z" fill="#000000" />
-                          <path d="M80,120 L80,150 L110,150 L110,120 L80,120 Z M90,130 L100,130 L100,140 L90,140 L90,130 Z" fill="#000000" />
-                          <path d="M120,120 L120,150 L150,150 L150,120 L120,120 Z M130,130 L140,130 L140,140 L130,140 L130,130 Z" fill="#000000" />
-                        </svg>
-                      </div>
-                      <p className="text-gray-300 mb-2">Quét mã QR để chuyển token vào ví của bạn</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-xs border-gray-700 hover:bg-gray-800 text-white"
-                        onClick={() => setShowQrCode(false)}
-                      >
-                        Ẩn mã QR
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-gray-300 mb-3">Địa chỉ ví của bạn:</p>
-                      <div className="bg-gray-900 p-2 rounded-lg flex items-center justify-between mb-4">
-                        <code className="text-purple-400 text-sm">
-                          {wallet.publicKey ? 
-                            `${wallet.publicKey.toString().slice(0, 8)}...${wallet.publicKey.toString().slice(-8)}` : 
-                            'Chưa kết nối ví'}
-                        </code>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0"
-                          onClick={copyWalletAddress}
-                          disabled={!wallet.publicKey}
-                        >
-                          <Copy className="h-4 w-4 text-gray-400" />
-                        </Button>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          className="flex-1 text-xs border-gray-700 bg-gray-800 hover:bg-gray-700 text-white"
-                          onClick={() => setShowQrCode(true)}
-                          disabled={!wallet.publicKey}
-                        >
-                          <QrCode className="w-4 h-4 mr-2" />
-                          Hiện mã QR
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          className="flex-1 text-xs border-gray-700 bg-gray-800 hover:bg-gray-700 text-white"
-                          disabled={!wallet.publicKey}
-                        >
-                          <Share2 className="w-4 h-4 mr-2" />
-                          Chia sẻ
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
             <Card className="bg-gray-900/50 border-gray-700">
               <CardHeader className="pb-3">
-                <CardTitle className="text-white text-lg">Quản lý Token</CardTitle>
+                <CardTitle className="text-white text-lg">Manage Token</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col space-y-3">
                 <Link href={`/tools/transfer?token=${token.id}`}>
                   <Button variant="ghost" className="w-full justify-start text-gray-200 hover:text-white hover:bg-gray-800">
                     <Send className="w-4 h-4 mr-3" />
-                    Gửi Token
+                    Send Token
                   </Button>
                 </Link>
                 <Link href={`/tools/mint?token=${token.id}`}>
                   <Button variant="ghost" className="w-full justify-start text-gray-200 hover:text-white hover:bg-gray-800">
                     <Banknote className="w-4 h-4 mr-3" />
-                    Tạo thêm Token
+                    Mint More Tokens
                   </Button>
                 </Link>
                 <Link href={`/tools/burn?token=${token.id}`}>
                   <Button variant="ghost" className="w-full justify-start text-gray-200 hover:text-white hover:bg-gray-800">
                     <Flame className="w-4 h-4 mr-3" />
-                    Đốt Token
+                    Burn Tokens
                   </Button>
                 </Link>
                 <Link href={`/tools/freeze?token=${token.id}`}>
                   <Button variant="ghost" className="w-full justify-start text-gray-200 hover:text-white hover:bg-gray-800">
                     <Settings className="w-4 h-4 mr-3" />
-                    Quản lý Token
+                    Manage Token
                   </Button>
                 </Link>
                 <Button 
@@ -705,7 +636,7 @@ export default function TokenDetailsPage() {
                   onClick={toggleFollowToken}
                 >
                   <Star className={`w-4 h-4 mr-3 ${isFollowing ? "fill-yellow-400" : ""}`} />
-                  {isFollowing ? "Bỏ theo dõi" : "Thêm vào theo dõi"}
+                  {isFollowing ? "Unfollow" : "Add to Watchlist"}
                 </Button>
               </CardContent>
             </Card>

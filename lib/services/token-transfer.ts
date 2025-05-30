@@ -7,7 +7,7 @@ import {
   createTransferCheckedInstruction
 } from "@solana/spl-token";
 
-// Import Token từ đường dẫn chính xác
+// Import Token from correct path
 import { Token } from "solana-token-extension-boost";
 import { saveTokensToCache } from "@/lib/utils/token-cache";
 import { getUserTokens } from "./tokenList";
@@ -30,12 +30,12 @@ export interface TokenTransferParams {
 }
 
 /**
- * Chuyển token từ ví người dùng đến một ví khác
+ * Transfer tokens from user wallet to another wallet
  * @param connection Solana connection
- * @param wallet Wallet context của người gửi
- * @param params Các tham số cho việc chuyển token
- * @param options Các options cho callback
- * @returns Signature của transaction
+ * @param wallet Sender's wallet context
+ * @param params Token transfer parameters
+ * @param options Options for callbacks
+ * @returns Transaction signature
  */
 export const transferToken = async (
   connection: Connection,
@@ -48,7 +48,7 @@ export const transferToken = async (
   const { publicKey, sendTransaction } = wallet;
   
   if (!publicKey || !connection || !sendTransaction) {
-    toast.error("Ví chưa được kết nối");
+    toast.error("Wallet not connected");
     return null;
   }
   
@@ -59,7 +59,7 @@ export const transferToken = async (
     const amountToSend = BigInt(Math.floor(parseFloat(amount) * Math.pow(10, decimals)));
     
     if (amountToSend <= BigInt(0)) {
-      throw new Error("Số lượng token không hợp lệ");
+      throw new Error("Invalid token amount");
     }
     
     // Parse addresses
@@ -70,71 +70,71 @@ export const transferToken = async (
     try {
       mintPublicKey = new PublicKey(mintAddress);
     } catch (err) {
-      console.error("Lỗi khi chuyển đổi địa chỉ mint:", err);
-      throw new Error("Địa chỉ mint token không hợp lệ");
+      console.error("Error converting mint address:", err);
+      throw new Error("Invalid token mint address");
     }
     
     try {
       recipientPublicKey = new PublicKey(recipientAddress);
     } catch (err) {
-      console.error("Lỗi khi chuyển đổi địa chỉ người nhận:", err);
-      throw new Error("Địa chỉ ví người nhận không hợp lệ");
+      console.error("Error converting recipient address:", err);
+      throw new Error("Invalid recipient wallet address");
     }
     
-    // Xác định token program
+    // Determine token program
     const tokenProgram = await determineTokenProgram(connection, mintPublicKey);
     
-    // Khởi tạo token instance từ SDK của chúng ta
+    // Initialize token instance from our SDK
     const token = new Token(connection, mintPublicKey);
     
-    // Debug: Kiểm tra các phương thức của Token class
+    // Debug: Check Token class methods
     console.log("Token class methods:", Object.getOwnPropertyNames(Token.prototype));
     console.log("Token instance:", token);
     
-    // Tạo hoặc lấy tài khoản token nguồn (người gửi)
-    console.log("Đang lấy tài khoản token nguồn...");
+    // Create or get source token account (sender)
+    console.log("Getting source token account...");
     let sourceTokenAccount;
     
     try {
-      // Lấy địa chỉ Associated Token Account cho người gửi - sử dụng phương thức từ Token class
+      // Get Associated Token Account address for sender - using Token class method
       const sourceAssociatedAddress = await token.getAssociatedAddress(
         publicKey,
         false
       );
       
-      // Kiểm tra xem tài khoản đã tồn tại chưa
+      // Check if account already exists
       const sourceAccountInfo = await connection.getAccountInfo(sourceAssociatedAddress);
       
       if (!sourceAccountInfo) {
-        throw new Error("Tài khoản token của bạn không tồn tại. Vui lòng tạo tài khoản token trước.");
+        throw new Error("Your token account does not exist. Please create a token account first.");
       }
       
-      console.log("Tài khoản token nguồn đã tồn tại:", sourceAssociatedAddress.toString());
+      console.log("Source token account exists:", sourceAssociatedAddress.toString());
       sourceTokenAccount = sourceAssociatedAddress;
     } catch (err) {
-      console.error("Lỗi khi kiểm tra tài khoản token nguồn:", err);
-      throw new Error("Không tìm thấy tài khoản token nguồn. Bạn cần có token trong ví trước khi chuyển.");
+      console.error("Error checking source token account:", err);
+      throw new Error("Source token account not found. You need to have tokens in your wallet before transferring.");
     }
     
-    // Tạo hoặc lấy tài khoản token đích (người nhận)
-    console.log("Đang lấy hoặc tạo tài khoản token đích...");
+    // Create or get destination token account (recipient)
+    console.log("Getting or creating destination token account...");
     let destinationTokenAccount;
     
-    // Lấy địa chỉ Associated Token Account cho người nhận - sử dụng phương thức từ Token class
+    // Get Associated Token Account address for recipient - using Token class method
     const destinationAssociatedAddress = await token.getAssociatedAddress(
       recipientPublicKey,
       false
     );
     
-    // Kiểm tra xem tài khoản đích đã tồn tại chưa
+    // Check if destination account already exists
     const destinationAccountInfo = await connection.getAccountInfo(destinationAssociatedAddress);
     
-    // Transaction để chứa các instructions
+    // Transaction to hold instructions
     const transaction = new Transaction();
     
-    // Nếu tài khoản đích chưa tồn tại, thêm instruction để tạo nó - sử dụng phương thức từ Token class
+    // If destination account doesn't exist, add instruction to create it - using Token class method
     if (!destinationAccountInfo) {
-      console.log("Tạo tài khoản token đích mới...");
+      console.log("Creating new destination token account...");
       transaction.add(
         token.createAssociatedTokenAccountInstruction(
           publicKey,             // Payer
@@ -143,15 +143,15 @@ export const transferToken = async (
         )
       );
     } else {
-      console.log("Tài khoản token đích đã tồn tại:", destinationAssociatedAddress.toString());
+      console.log("Destination token account exists:", destinationAssociatedAddress.toString());
     }
     
     destinationTokenAccount = destinationAssociatedAddress;
     
-    // Tạo instruction chuyển token
-    console.log("Tạo lệnh chuyển token...");
+    // Create token transfer instruction
+    console.log("Creating token transfer instruction...");
     
-    // Thêm instruction chuyển token
+    // Add token transfer instruction
     transaction.add(
       createTransferCheckedInstruction(
         sourceTokenAccount,          // Source
@@ -165,7 +165,7 @@ export const transferToken = async (
       )
     );
     
-    // Thêm memo nếu có
+    // Add memo if provided
     if (memo) {
       const memoId = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
       transaction.add({
@@ -175,27 +175,27 @@ export const transferToken = async (
       });
     }
     
-    // Lấy blockhash
+    // Get blockhash
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = publicKey;
     
-    // Gửi transaction bằng wallet adapter
-    console.log("Gửi transaction...");
+    // Send transaction using wallet adapter
+    console.log("Sending transaction...");
     const signature = await sendTransaction(transaction, connection, {
       skipPreflight: false,
       preflightCommitment: "confirmed"
     });
     
-    // Đợi xác nhận
-    console.log("Đợi xác nhận...");
+    // Wait for confirmation
+    console.log("Waiting for confirmation...");
     await connection.confirmTransaction({
       blockhash,
       lastValidBlockHeight,
       signature
     }, "confirmed");
     
-    // Cập nhật token cache sau khi chuyển thành công
+    // Update token cache after successful transfer
     await updateTokenCache(connection, wallet);
     
     if (onSuccess) onSuccess(signature);
@@ -205,18 +205,18 @@ export const transferToken = async (
     console.error("Error transferring token:", error);
     
     // Provide more user-friendly error messages
-    let errorMessage = "Có lỗi xảy ra khi chuyển token";
+    let errorMessage = "An error occurred while transferring token";
     
     if (error.message?.includes("NonTransferable")) {
-      errorMessage = "Token này không thể chuyển (có extension NonTransferable)";
+      errorMessage = "This token cannot be transferred (has NonTransferable extension)";
     } else if (error.message?.includes("insufficient funds")) {
-      errorMessage = "Số dư không đủ để thực hiện giao dịch";
+      errorMessage = "Insufficient balance to complete transaction";
     } else if (error.message?.includes("invalid account owner")) {
-      errorMessage = "Chủ tài khoản không hợp lệ";
+      errorMessage = "Invalid account owner";
     } else if (error.message?.includes("failed to send transaction")) {
-      errorMessage = "Không thể gửi giao dịch, vui lòng thử lại";
+      errorMessage = "Failed to send transaction, please try again";
     } else if (error instanceof Error && error.name === "TokenAccountNotFoundError") {
-      errorMessage = "Không tìm thấy tài khoản token. Vui lòng đảm bảo bạn có đủ SOL để tạo tài khoản token";
+      errorMessage = "Token account not found. Please make sure you have enough SOL to create token account";
     }
     
     toast.error(errorMessage);
@@ -229,9 +229,9 @@ export const transferToken = async (
 };
 
 /**
- * Xác định token program của token (Token Program hay Token-2022 Program)
+ * Determine token program for a token (Token Program or Token-2022 Program)
  * @param connection Solana connection
- * @param mintAddress Địa chỉ mint của token
+ * @param mintAddress Token mint address
  * @returns Token program ID
  */
 export async function determineTokenProgram(
@@ -239,14 +239,14 @@ export async function determineTokenProgram(
   mintAddress: PublicKey
 ): Promise<PublicKey> {
   try {
-    // Kiểm tra account info
+    // Check account info
     const accountInfo = await connection.getAccountInfo(mintAddress);
     
     if (!accountInfo) {
-      throw new Error("Token mint không tồn tại");
+      throw new Error("Token mint does not exist");
     }
     
-    // Kiểm tra owner của account là Token Program hay Token-2022 Program
+    // Check if account owner is Token Program or Token-2022 Program
     if (accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)) {
       return TOKEN_2022_PROGRAM_ID;
     }
@@ -254,13 +254,13 @@ export async function determineTokenProgram(
     return TOKEN_PROGRAM_ID;
   } catch (error) {
     console.error("Error determining token program:", error);
-    // Mặc định sử dụng Token Program
+    // Default to Token Program
     return TOKEN_PROGRAM_ID;
   }
 }
 
 /**
- * Cập nhật token cache sau khi chuyển token thành công
+ * Update token cache after successful token transfer
  * @param connection Solana connection
  * @param wallet Wallet context
  */

@@ -1,10 +1,10 @@
 import { TokenItem } from "@/lib/services/tokenList";
 
-// Đặt key cho localStorage và thời gian cache (5 phút)
+// Set key for localStorage and cache time (5 minutes)
 const TOKENS_STORAGE_KEY = 'tokenui-cached-tokens';
-const CACHE_EXPIRY_TIME = 5 * 60 * 1000; // 5 phút tính bằng mili-giây
+const CACHE_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-// Interface cho dữ liệu được cache
+// Interface for cached data
 export interface CachedTokenData {
   tokens: TokenItem[];
   publicKey: string;
@@ -12,7 +12,7 @@ export interface CachedTokenData {
   totalValue: string;
 }
 
-// Hàm lưu dữ liệu token vào localStorage
+// Function to save token data to localStorage
 export const saveTokensToCache = (tokenData: TokenItem[], totalValue: string, publicKey: string) => {
   if (!publicKey) return;
 
@@ -30,7 +30,7 @@ export const saveTokensToCache = (tokenData: TokenItem[], totalValue: string, pu
   }
 };
 
-// Hàm đọc dữ liệu token từ localStorage
+// Function to read token data from localStorage
 export const getTokensFromCache = (publicKey: string): CachedTokenData | null => {
   if (!publicKey) return null;
 
@@ -40,10 +40,10 @@ export const getTokensFromCache = (publicKey: string): CachedTokenData | null =>
 
     const parsedData: CachedTokenData = JSON.parse(cachedData);
     
-    // Kiểm tra xem dữ liệu có thuộc về ví hiện tại không
+    // Check if data belongs to the current wallet
     if (parsedData.publicKey !== publicKey.toString()) return null;
     
-    // Kiểm tra xem dữ liệu có hết hạn không
+    // Check if data is expired
     if (Date.now() - parsedData.timestamp > CACHE_EXPIRY_TIME) return null;
     
     return parsedData;

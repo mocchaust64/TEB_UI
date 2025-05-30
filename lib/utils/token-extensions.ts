@@ -2,14 +2,14 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { TokenItem as BaseTokenItem } from "../services/tokenList";
 
-// Mở rộng interface TokenItem để bao gồm thuộc tính details
+// Extend TokenItem interface to include details property
 export interface TokenItemWithDetails extends BaseTokenItem {
   details?: string;
-  mintAuthority?: boolean; // Có quyền mint hay không
+  mintAuthority?: boolean; // Whether user has mint authority
 }
 
 /**
- * Thông tin về các extension của token
+ * Information about token extensions
  */
 export interface TokenExtensionInfo {
   isToken2022: boolean;
@@ -39,7 +39,7 @@ export interface TokenExtensionInfo {
   uri?: string;
 }
 
-// Định nghĩa kiểu cảnh báo
+// Define warning types
 export type WarningType = 'warning' | 'error' | 'info';
 export interface ExtensionWarning {
   type: WarningType;
@@ -48,45 +48,45 @@ export interface ExtensionWarning {
 }
 
 /**
- * Kiểm tra extension của token từ details string
- * @param details Thông tin chi tiết của token
- * @returns Thông tin về extensions của token
+ * Check token extensions from details string
+ * @param details Token details information
+ * @returns Information about token extensions
  */
 export function parseTokenExtensionsFromDetails(details?: string): Partial<TokenExtensionInfo> {
   if (!details) return {};
   
   let extensions: Partial<TokenExtensionInfo> = {
-    isToken2022: true, // Nếu có details, giả định đây là token 2022
+    isToken2022: true, // If details exists, assume this is a token 2022
   };
   
-  // Kiểm tra TransferFee
+  // Check TransferFee
   if (details.includes("Fee:") && details.includes("%")) {
     extensions.hasTransferFee = true;
     
-    // Phân tích chuỗi để lấy phần trăm phí
+    // Parse string to get fee percentage
     const feeMatch = details.match(/Fee:\s*(\d+(\.\d+)?)%/);
     if (feeMatch && feeMatch[1]) {
       extensions.feePercentage = parseFloat(feeMatch[1]);
-      extensions.feeBasisPoints = extensions.feePercentage * 100; // Chuyển % thành basis points
+      extensions.feeBasisPoints = extensions.feePercentage * 100; // Convert % to basis points
     }
     
-    // Phân tích max fee nếu có
+    // Parse max fee if available
     const maxFeeMatch = details.match(/Max Fee:\s*(\d+(\.\d+)?)/);
     if (maxFeeMatch && maxFeeMatch[1]) {
       extensions.maxFee = maxFeeMatch[1];
     }
   }
   
-  // Kiểm tra NonTransferable
+  // Check NonTransferable
   if (details.includes("Non-Transferable")) {
     extensions.hasNonTransferable = true;
   }
   
-  // Kiểm tra PermanentDelegate
+  // Check PermanentDelegate
   if (details.includes("Permanent Delegate")) {
     extensions.hasPermanentDelegate = true;
     
-    // Cố gắng lấy địa chỉ delegate nếu có
+    // Try to get delegate address if available
     const delegateMatch = details.match(/Delegate:\s*([1-9A-HJ-NP-Za-km-z]{32,44})/);
     if (delegateMatch && delegateMatch[1]) {
       extensions.delegateAddress = delegateMatch[1];
@@ -97,11 +97,11 @@ export function parseTokenExtensionsFromDetails(details?: string): Partial<Token
 }
 
 /**
- * Tính toán phí chuyển token dựa trên số lượng và phần trăm phí
- * @param amount Số lượng token chuyển
- * @param feePercentage Phần trăm phí (ví dụ: 1.5 cho 1.5%)
- * @param decimals Số chữ số thập phân của token
- * @returns Thông tin về phí chuyển
+ * Calculate token transfer fee based on amount and fee percentage
+ * @param amount Token transfer amount
+ * @param feePercentage Fee percentage (e.g. 1.5 for 1.5%)
+ * @param decimals Token decimal places
+ * @returns Transfer fee information
  */
 export function calculateTransferFee(amount: string, feePercentage: number = 0, decimals: number = 0) {
   const numAmount = parseFloat(amount);
@@ -125,10 +125,10 @@ export function calculateTransferFee(amount: string, feePercentage: number = 0, 
 }
 
 /**
- * Kiểm tra xem token có phải là Token-2022 không
- * @param connection Kết nối Solana
- * @param mintAddress Địa chỉ mint của token
- * @returns true nếu là Token-2022, false nếu không phải
+ * Check if token is a Token-2022
+ * @param connection Solana connection
+ * @param mintAddress Token mint address
+ * @returns true if it's Token-2022, false otherwise
  */
 export async function isToken2022(connection: Connection, mintAddress: string | PublicKey): Promise<boolean> {
   try {
@@ -145,16 +145,16 @@ export async function isToken2022(connection: Connection, mintAddress: string | 
 }
 
 /**
- * Kiểm tra các extension của token
- * @param connection Kết nối Solana
- * @param token Thông tin token
- * @returns Thông tin về extensions của token
+ * Check token extensions
+ * @param connection Solana connection
+ * @param token Token information
+ * @returns Information about token extensions
  */
 export async function getTokenExtensions(
   connection: Connection,
   token: TokenItemWithDetails
 ): Promise<TokenExtensionInfo> {
-  // Khởi tạo thông tin extension mặc định
+  // Initialize default extension information
   const extensionInfo: TokenExtensionInfo = {
     isToken2022: false,
     hasTransferFee: false,
@@ -170,17 +170,17 @@ export async function getTokenExtensions(
     
     if (!mintInfo) return extensionInfo;
     
-    // Kiểm tra program ID để xác định có phải token-2022 không
+    // Check program ID to determine if it's token-2022
     extensionInfo.isToken2022 = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
     
     if (!extensionInfo.isToken2022) {
-      return extensionInfo; // Nếu không phải Token-2022, không cần kiểm tra thêm
+      return extensionInfo; // If not Token-2022, no need to check further
     }
     
-    // Phân tích thông tin extension từ details
+    // Parse extension information from details
     const detailsExtensions = parseTokenExtensionsFromDetails(token.details);
     
-    // Cập nhật thông tin extension
+    // Update extension information
     return {
       ...extensionInfo,
       ...detailsExtensions
@@ -192,12 +192,12 @@ export async function getTokenExtensions(
 }
 
 /**
- * Tạo thông báo cảnh báo dựa trên các extension của token
- * @param extensionInfo Thông tin về extensions của token
- * @param amount Số lượng token muốn chuyển
- * @param symbol Ký hiệu của token
- * @param decimals Số chữ số thập phân của token
- * @returns Mảng các thông báo cảnh báo
+ * Create warning messages based on token extensions
+ * @param extensionInfo Information about token extensions
+ * @param amount Amount of tokens to transfer
+ * @param symbol Token symbol
+ * @param decimals Token decimal places
+ * @returns Array of warning messages
  */
 export function generateExtensionWarnings(
   extensionInfo: TokenExtensionInfo,
@@ -207,16 +207,16 @@ export function generateExtensionWarnings(
 ): ExtensionWarning[] {
   const warnings: ExtensionWarning[] = [];
   
-  // Kiểm tra Non-Transferable
+  // Check Non-Transferable
   if (extensionInfo.hasNonTransferable) {
     warnings.push({
       type: 'error',
       title: 'Token Non-Transferable',
-      message: 'Token này không thể chuyển cho người khác do có extension Non-Transferable.'
+      message: 'This token cannot be transferred to others due to the Non-Transferable extension.'
     });
   }
   
-  // Kiểm tra Transfer Fee
+  // Check Transfer Fee
   if (extensionInfo.hasTransferFee && extensionInfo.feePercentage) {
     const { feeAmount, receivedAmount } = calculateTransferFee(
       amount,
@@ -226,17 +226,17 @@ export function generateExtensionWarnings(
     
     warnings.push({
       type: 'warning',
-      title: `Token có phí chuyển ${extensionInfo.feePercentage}%`,
-      message: `Khi chuyển ${amount} ${symbol}, người nhận sẽ bị trừ ${feeAmount} ${symbol} phí và thực nhận ${receivedAmount} ${symbol}.`
+      title: `Token has transfer fee ${extensionInfo.feePercentage}%`,
+      message: `When transferring ${amount} ${symbol}, the recipient will be charged ${feeAmount} ${symbol} fee and receive ${receivedAmount} ${symbol}.`
     });
   }
   
-  // Kiểm tra Permanent Delegate
+  // Check Permanent Delegate
   if (extensionInfo.hasPermanentDelegate) {
     warnings.push({
       type: 'info',
-      title: 'Token có Permanent Delegate',
-      message: 'Token này có một địa chỉ delegate vĩnh viễn có thể thực hiện các hành động trên token của bạn.'
+      title: 'Token has Permanent Delegate',
+      message: 'This token has a permanent delegate address that can perform actions on your tokens.'
     });
   }
   
@@ -244,9 +244,9 @@ export function generateExtensionWarnings(
 }
 
 /**
- * Tạo đoạn mô tả ngắn gọn về các extension của token
- * @param extensionInfo Thông tin về extensions của token
- * @returns Mô tả ngắn gọn về các extension
+ * Create a brief description of token extensions
+ * @param extensionInfo Information about token extensions
+ * @returns Brief description of extensions
  */
 export function getExtensionSummary(extensionInfo: TokenExtensionInfo): string {
   const extensions = [];
@@ -271,7 +271,7 @@ export function getExtensionSummary(extensionInfo: TokenExtensionInfo): string {
     extensions.push('Metadata');
   }
   
-  if (extensions.length === 0) return 'Không có extension';
+  if (extensions.length === 0) return 'No extensions';
   
   return extensions.join(', ');
 } 

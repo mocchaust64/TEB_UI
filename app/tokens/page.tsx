@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { CommonLayout } from "@/components/common-layout"
 import { PageLoadingSkeleton } from "@/components/loading-skeleton"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   Coins, 
   Plus, 
@@ -24,9 +24,6 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react"
 import { TokenItem } from "@/lib/services/tokenList"
 import { toast } from "sonner"
 import { WalletButton } from "@/components/wallet-button"
-import { Badge } from "@/components/ui/badge"
-import { TransactionItem } from "@/lib/services/transaction-service"
-import { formatMintAddress, formatTokenBalance } from "@/lib/utils/format-utils"
 import { getTokensFromCache } from "@/lib/utils/token-cache"
 import { fetchTokensFromBlockchain, fetchRecentTransactions } from "@/lib/services/token-service"
 import { TokenItem as TokenItemComponent } from "@/components/token/token-item"
@@ -36,7 +33,7 @@ import { useTokenSearch } from "@/hooks/use-token-search"
 import { usePagination } from "@/hooks/use-pagination"
 import { TransactionType } from "@/components/transaction/transaction-icons"
 
-// Interface cho giao dịch
+// Transaction interface
 interface Transaction {
   id: string;
   type: TransactionType;
@@ -60,9 +57,9 @@ export default function TokenPortfolio() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
-  const [displayedTransactions, setDisplayedTransactions] = useState(5) // Số giao dịch hiển thị
+  const [displayedTransactions, setDisplayedTransactions] = useState(5) // Number of transactions to display
   
-  // Phân trang
+  // Pagination
   const [tokensPerPage] = useState(5)
   
   // Get wallet and connection
@@ -70,7 +67,7 @@ export default function TokenPortfolio() {
   const { publicKey, connected } = wallet
   const { connection } = useConnection()
   
-  // Sử dụng hooks đã tách
+  // Use extracted hooks
   const { searchTerm, setSearchTerm, filteredTokens } = useTokenSearch({ tokens });
   const { 
     currentPage, 
@@ -139,7 +136,7 @@ export default function TokenPortfolio() {
         setIsLoadingTransactions(true)
       },
       onSuccess: (transactionData) => {
-        // Chuyển đổi từ TransactionItem sang Transaction
+        // Convert from TransactionItem to Transaction
         const transactions: Transaction[] = transactionData.map(tx => ({
           id: tx.id,
           type: tx.type as TransactionType,
@@ -207,12 +204,12 @@ export default function TokenPortfolio() {
     })
   }
   
-  // Hàm để xem thêm hoặc thu gọn giao dịch
+  // Function to expand or collapse transactions
   const toggleTransactionsDisplay = () => {
     if (displayedTransactions === 5) {
-      setDisplayedTransactions(recentTransactions.length); // Hiển thị tất cả
+      setDisplayedTransactions(recentTransactions.length); // Show all
     } else {
-      setDisplayedTransactions(5); // Thu gọn về 5
+      setDisplayedTransactions(5); // Collapse to 5
     }
   };
   
@@ -341,7 +338,7 @@ export default function TokenPortfolio() {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Cột bên trái - Danh sách token */}
+                {/* Left column - Token list */}
                 <div className="lg:col-span-2">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div className="flex items-center">
@@ -412,7 +409,7 @@ export default function TokenPortfolio() {
                   ))}
                           </div>
                           
-                          {/* Điều khiển phân trang */}
+                          {/* Pagination controls */}
                           <PaginationControls
                             currentPage={currentPage}
                             totalPages={totalPages}
@@ -470,7 +467,7 @@ export default function TokenPortfolio() {
           </Tabs>
                 </div>
                 
-                {/* Cột bên phải - Giao dịch gần đây */}
+                {/* Right column - Recent activity */}
                 <div className="lg:col-span-1">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-white">Recent Activity</h2>

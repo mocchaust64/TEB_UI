@@ -67,21 +67,21 @@ const mockAccounts = [
   {
     id: "acc1",
     address: "3xyzABC...",
-    owner: "Người dùng A",
+    owner: "User A",
     balance: "200,000",
     isFrozen: false
   },
   {
     id: "acc2",
     address: "4abcDEF...",
-    owner: "Người dùng B",
+    owner: "User B",
     balance: "350,000",
     isFrozen: true
   },
   {
     id: "acc3",
     address: "5lmnGHI...",
-    owner: "Người dùng C",
+    owner: "User C",
     balance: "120,000",
     isFrozen: false
   }
@@ -135,9 +135,9 @@ export default function FreezeToken() {
     setTimeout(() => {
       setIsProcessing(false);
       if (freezeAction === "freeze") {
-        alert("Đóng băng tài khoản token thành công!");
+        alert("Freeze token account successfully!");
       } else {
-        alert("Mở đóng băng tài khoản token thành công!");
+        alert("Unfreeze token account successfully!");
       }
       router.push("/tools");
     }, 2000);
@@ -171,7 +171,7 @@ export default function FreezeToken() {
             className="text-gray-400 hover:text-white p-0 flex items-center gap-1"
             onClick={() => router.push("/tools")}
           >
-            <ArrowLeft className="h-4 w-4" /> Quay lại
+            <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </div>
       
@@ -185,10 +185,10 @@ export default function FreezeToken() {
             <ShieldCheck className="w-8 h-8 text-cyan-400" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            Đóng Băng Token
+            Freeze Token
           </h1>
           <p className="text-gray-400 text-lg max-w-xl text-center">
-            Đóng băng hoặc mở đóng băng tài khoản token (với quyền Freeze)
+            Freeze or unfreeze token accounts (with Freeze authority)
           </p>
         </motion.div>
         
@@ -200,25 +200,25 @@ export default function FreezeToken() {
         >
           <Card className="bg-gray-900/50 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white text-xl">Chi tiết đóng băng token</CardTitle>
+              <CardTitle className="text-white text-xl">Token Freeze Details</CardTitle>
               <CardDescription className="text-gray-400">
-                Điền thông tin chi tiết để đóng băng hoặc mở đóng băng tài khoản token
+                Enter details to freeze or unfreeze token accounts
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Alert className="bg-cyan-900/20 border-cyan-700 text-cyan-100">
                 <Info className="h-4 w-4 text-cyan-400" />
-                <AlertTitle>Thông tin quan trọng</AlertTitle>
+                <AlertTitle>Important Information</AlertTitle>
                 <AlertDescription className="text-cyan-200">
-                  Bạn chỉ có thể đóng băng tài khoản token nếu bạn có quyền Freeze Authority đối với token đó.
+                  You can only freeze token accounts if you have Freeze Authority for that token.
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-2">
-                <Label htmlFor="token" className="text-white">Chọn Token</Label>
+                <Label htmlFor="token" className="text-white">Select Token</Label>
                 <Select value={selectedToken} onValueChange={setSelectedToken}>
                   <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
-                    <SelectValue placeholder="Chọn token để đóng băng/mở đóng băng tài khoản" />
+                    <SelectValue placeholder="Select a token to freeze/unfreeze accounts" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
                     {mockTokens.map((token) => (
@@ -233,7 +233,7 @@ export default function FreezeToken() {
                           </div>
                           <span>{token.name} ({token.symbol})</span>
                           {!token.freezeAuthority && (
-                            <span className="ml-2 text-red-400 text-xs">Không có quyền đóng băng</span>
+                            <span className="ml-2 text-red-400 text-xs">No freeze authority</span>
                           )}
                         </div>
                       </SelectItem>
@@ -244,10 +244,10 @@ export default function FreezeToken() {
               
               {currentToken?.freezeAuthority && (
                 <div className="space-y-2">
-                  <Label htmlFor="account" className="text-white">Chọn tài khoản token</Label>
+                  <Label htmlFor="account" className="text-white">Select Token Account</Label>
                   <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                     <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
-                      <SelectValue placeholder="Chọn tài khoản token để đóng băng/mở đóng băng" />
+                      <SelectValue placeholder="Select a token account to freeze/unfreeze" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
                       {mockAccounts.map((account) => (
@@ -266,7 +266,7 @@ export default function FreezeToken() {
                             <span>{account.address} ({account.owner})</span>
                             <span className="ml-2 text-gray-400">- {account.balance}</span>
                             {account.isFrozen && (
-                              <span className="ml-2 text-cyan-400 text-xs">Đã đóng băng</span>
+                              <span className="ml-2 text-cyan-400 text-xs">Frozen</span>
                             )}
                           </div>
                         </SelectItem>
@@ -280,27 +280,27 @@ export default function FreezeToken() {
                 <>
                   <div className="bg-gray-800/40 rounded-md p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm text-gray-400">Địa chỉ tài khoản</p>
+                      <p className="text-sm text-gray-400">Account Address</p>
                       <p className="text-white font-medium">{currentAccount.address}</p>
                     </div>
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm text-gray-400">Chủ sở hữu</p>
+                      <p className="text-sm text-gray-400">Owner</p>
                       <p className="text-white font-medium">{currentAccount.owner}</p>
                     </div>
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm text-gray-400">Số dư</p>
+                      <p className="text-sm text-gray-400">Balance</p>
                       <p className="text-white font-medium">{currentAccount.balance} {currentToken?.symbol}</p>
                     </div>
                     <div className="flex justify-between items-center">
-                      <p className="text-sm text-gray-400">Trạng thái hiện tại</p>
+                      <p className="text-sm text-gray-400">Current Status</p>
                       <p className={`font-medium ${currentAccount.isFrozen ? 'text-cyan-400' : 'text-green-400'}`}>
-                        {currentAccount.isFrozen ? 'Đã đóng băng' : 'Đang hoạt động'}
+                        {currentAccount.isFrozen ? 'Frozen' : 'Active'}
                       </p>
                     </div>
                   </div>
                 
                   <div className="space-y-2">
-                    <Label className="text-white">Hành động</Label>
+                    <Label className="text-white">Action</Label>
                     <RadioGroup value={freezeAction} onValueChange={(value: "freeze" | "unfreeze") => setFreezeAction(value)} className="flex space-x-4">
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem 
@@ -310,7 +310,7 @@ export default function FreezeToken() {
                           className="border-cyan-600 text-cyan-600"
                         />
                         <Label htmlFor="freeze" className={`${currentAccount.isFrozen ? 'text-gray-500' : 'text-white'}`}>
-                          Đóng băng tài khoản
+                          Freeze Account
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -321,7 +321,7 @@ export default function FreezeToken() {
                           className="border-green-600 text-green-600"
                         />
                         <Label htmlFor="unfreeze" className={`${!currentAccount.isFrozen ? 'text-gray-500' : 'text-white'}`}>
-                          Mở đóng băng
+                          Unfreeze Account
                         </Label>
                       </div>
                     </RadioGroup>
@@ -340,21 +340,21 @@ export default function FreezeToken() {
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
                   </>
                 ) : freezeAction === "freeze" ? (
                   <>
-                    <LockIcon className="mr-2 h-4 w-4" /> Đóng băng tài khoản
+                    <LockIcon className="mr-2 h-4 w-4" /> Freeze Account
                   </>
                 ) : (
                   <>
-                    <UnlockIcon className="mr-2 h-4 w-4" /> Mở đóng băng tài khoản
+                    <UnlockIcon className="mr-2 h-4 w-4" /> Unfreeze Account
                   </>
                 )}
               </Button>
               
               <p className="text-xs text-gray-400 text-center">
-                Giao dịch sẽ được xác nhận thông qua ví đã kết nối của bạn.
+                Transaction will be confirmed through your connected wallet.
               </p>
             </CardFooter>
           </Card>

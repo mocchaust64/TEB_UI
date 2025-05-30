@@ -10,7 +10,8 @@ import {
   BookOpen, 
   Layers,
   Wrench,
-  Search
+  Search,
+  Home
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
@@ -105,12 +106,11 @@ export default function Navbar() {
   };
 
   const mobileLinks = [
-    { href: "/create", label: "Create Token", icon: <Plus className="w-5 h-5 mr-3 text-purple-400" /> },
+    { href: "/", label: "Home", icon: <Home className="w-5 h-5 mr-3 text-purple-400" /> },
     { href: "/tokens", label: "Tokens", icon: <Coins className="w-5 h-5 mr-3 text-blue-400" /> },
     { href: "/tools", label: "Tools", icon: <Wrench className="w-5 h-5 mr-3 text-green-400" /> },
-    { href: "/manage", label: "Manage", icon: <Settings className="w-5 h-5 mr-3 text-yellow-400" /> },
-    { href: "/extensions", label: "Extensions", icon: <Layers className="w-5 h-5 mr-3 text-pink-400" /> },
-    { href: "/docs", label: "Documentation", icon: <BookOpen className="w-5 h-5 mr-3 text-cyan-400" /> },
+    { href: "https://solana.com/solutions/token-extensions", label: "Extensions", icon: <Layers className="w-5 h-5 mr-3 text-pink-400" />, external: true },
+    { href: "https://github.com/mocchaust64/token-extensions-boost", label: "Documentation", icon: <BookOpen className="w-5 h-5 mr-3 text-cyan-400" />, external: true },
   ];
 
   // Lọc các liên kết khi tìm kiếm
@@ -135,12 +135,11 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center space-x-8">
-          <NavLink href="/create">Create Token</NavLink>
+          <NavLink href="/">Home</NavLink>
           <NavLink href="/tokens">Tokens</NavLink>
           <NavLink href="/tools">Tools</NavLink>
-          <NavLink href="/manage">Manage</NavLink>
-          <NavLink href="/extensions">Extensions</NavLink>
-          <NavLink href="/docs">Documentation</NavLink>
+          <NavLink href="https://solana.com/solutions/token-extensions" external>Extensions</NavLink>
+          <NavLink href="https://github.com/mocchaust64/token-extensions-boost" external>Documentation</NavLink>
         </div>
 
         <div className="hidden md:flex items-center space-x-3">
@@ -227,6 +226,7 @@ export default function Navbar() {
                       href={link.href} 
                       onClick={() => setIsMobileMenuOpen(false)}
                       icon={link.icon}
+                      external={link.external}
                     >
                       {link.label}
                     </MobileNavLink>
@@ -259,7 +259,16 @@ export default function Navbar() {
   )
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({ href, children, external }: { href: string; children: React.ReactNode; external?: boolean }) {
+  if (external) {
+    return (
+      <a href={href} className="text-gray-300 hover:text-white transition-colors relative group" target="_blank" rel="noopener noreferrer">
+        {children}
+        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-purple-500 transition-all group-hover:w-full" />
+      </a>
+    )
+  }
+  
   return (
     <Link href={href} className="text-gray-300 hover:text-white transition-colors relative group">
       {children}
@@ -268,11 +277,12 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   )
 }
 
-function MobileNavLink({ href, onClick, icon, children }: { 
+function MobileNavLink({ href, onClick, icon, children, external }: { 
   href: string; 
   onClick: () => void;
   icon?: React.ReactNode;
-  children: React.ReactNode 
+  children: React.ReactNode;
+  external?: boolean;
 }) {
   const [isPressed, setIsPressed] = useState(false);
 
@@ -280,32 +290,52 @@ function MobileNavLink({ href, onClick, icon, children }: {
   const handlePressDown = () => setIsPressed(true);
   const handlePressUp = () => setIsPressed(false);
 
-  return (
-    <Link 
-      href={href} 
-      className={`flex items-center px-4 py-3.5 rounded-md text-lg text-gray-200 hover:text-white transition-colors relative overflow-hidden
-                 ${isPressed ? 'bg-gray-800/70' : 'hover:bg-gray-800/40'}`}
-      onClick={onClick}
-      onMouseDown={handlePressDown}
-      onMouseUp={handlePressUp}
-      onMouseLeave={handlePressUp}
-      onTouchStart={handlePressDown}
-      onTouchEnd={handlePressUp}
-    >
-      {/* Hiệu ứng ripple */}
+  const commonProps = {
+    className: `flex items-center px-4 py-3.5 rounded-md text-lg text-gray-200 hover:text-white transition-colors relative overflow-hidden
+               ${isPressed ? 'bg-gray-800/70' : 'hover:bg-gray-800/40'}`,
+    onClick,
+    onMouseDown: handlePressDown,
+    onMouseUp: handlePressUp,
+    onMouseLeave: handlePressUp,
+    onTouchStart: handlePressDown,
+    onTouchEnd: handlePressUp
+  };
+
+  // Hiệu ứng ripple và nội dung
+  const content = (
+    <>
       {isPressed && (
         <span className="absolute inset-0 bg-gradient-to-r from-purple-500/30 to-pink-500/20 animate-ripple" />
       )}
-
-      {/* Icon và text */}
       {icon}
       <span>{children}</span>
-      
       <div className="ml-auto opacity-50">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 6l6 6-6 6"/>
         </svg>
       </div>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a 
+        href={href} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        {...commonProps}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link 
+      href={href}
+      {...commonProps}
+    >
+      {content}
     </Link>
-  )
+  );
 }

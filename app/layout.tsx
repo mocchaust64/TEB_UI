@@ -20,6 +20,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <style>
+          {`
+            /* Ẩn thông báo lỗi 429 từ Next.js */
+            nextjs-portal {
+              display: none !important;
+            }
+          `}
+        </style>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            // Ngăn chặn sự kiện lỗi trước khi Next.js xử lý
+            window.addEventListener('error', function(event) {
+              // Kiểm tra nếu là lỗi 429
+              if (event.message && event.message.includes('429')) {
+                event.stopImmediatePropagation();
+              }
+            });
+            window.addEventListener('unhandledrejection', function(event) {
+              // Kiểm tra nếu là lỗi 429
+              if (event.reason && event.reason.message && event.reason.message.includes('429')) {
+                event.stopImmediatePropagation();
+              }
+            });
+          `
+        }} />
+      </head>
       <body className={inter.className}>
         <SolanaWalletProvider>
           {children}

@@ -18,11 +18,11 @@ interface UsePaginationResult<T> {
 }
 
 /**
- * Hook quản lý phân trang
- * @param items Danh sách items cần phân trang
- * @param itemsPerPage Số items mỗi trang
- * @param initialPage Trang ban đầu (mặc định là 1)
- * @returns Các giá trị và hàm xử lý phân trang
+ * Hook for managing pagination
+ * @param items List of items to paginate
+ * @param itemsPerPage Number of items per page
+ * @param initialPage Initial page (default is 1)
+ * @returns Pagination values and handler functions
  */
 export function usePagination<T>({ 
   items, 
@@ -34,34 +34,34 @@ export function usePagination<T>({
   const [totalPages, setTotalPages] = useState(1);
   const [pageNumbers, setPageNumbers] = useState<number[]>([]);
 
-  // Tính toán tổng số trang và cập nhật items cho trang hiện tại
+  // Calculate total pages and update items for current page
   useEffect(() => {
-    // Tính toán số trang
+    // Calculate number of pages
     const total = Math.ceil(items.length / itemsPerPage) || 1;
     setTotalPages(total);
     
-    // Điều chỉnh trang hiện tại nếu vượt quá số trang
+    // Adjust current page if it exceeds total pages
     if (currentPage > total) {
       setCurrentPage(1);
     }
     
-    // Lấy items cho trang hiện tại
+    // Get items for current page
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     setPaginatedItems(items.slice(startIndex, endIndex));
     
-    // Tính toán các số trang cần hiển thị
+    // Calculate page numbers to display
     setPageNumbers(getPageNumbers(currentPage, total));
   }, [items, currentPage, itemsPerPage]);
 
-  // Di chuyển đến trang trước
+  // Move to previous page
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(prev => prev - 1);
     }
   };
   
-  // Di chuyển đến trang tiếp theo
+  // Move to next page
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);

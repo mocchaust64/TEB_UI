@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowDownLeft, ArrowUpRight, Clock, Plus } from 'lucide-react';
 
-// Các loại giao dịch được hỗ trợ
+
 export type TransactionType = 'receive' | 'send' | 'swap' | 'mint' | 'burn';
 
 interface TransactionIconProps {
@@ -10,9 +10,7 @@ interface TransactionIconProps {
   className?: string;
 }
 
-/**
- * Component hiển thị icon dựa trên loại giao dịch
- */
+
 export const TransactionIcon: React.FC<TransactionIconProps> = ({ 
   type, 
   size = 16,
@@ -79,9 +77,7 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   }
 };
 
-/**
- * Hàm utility để lấy icon dựa trên loại giao dịch
- */
+
 export const getTransactionIcon = (type: TransactionType, size: number = 16, className: string = "") => {
   return <TransactionIcon type={type} size={size} className={className} />;
 }; 

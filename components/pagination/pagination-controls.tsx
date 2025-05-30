@@ -23,21 +23,21 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   itemsPerPage,
   itemName = 'items'
 }) => {
-  // Tính chỉ số bắt đầu và kết thúc của items trên trang hiện tại
+  
   const startIndex = Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1);
   const endIndex = Math.min(totalItems, currentPage * itemsPerPage);
 
-  // Lấy danh sách các số trang để hiển thị
+
   const pageNumbers = getPageNumbers(currentPage, totalPages);
 
-  // Hàm di chuyển đến trang trước
+
   const goToPreviousPage = () => {
     if (currentPage > 1) {
       onPageChange(currentPage - 1);
     }
   };
 
-  // Hàm di chuyển đến trang tiếp theo
+
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       onPageChange(currentPage + 1);
