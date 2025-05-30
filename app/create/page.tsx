@@ -71,13 +71,13 @@ type TokenExtensionType = {
 const validatePublicKey = (value: string): { valid: boolean, message?: string } => {
   // Kiểm tra xem có phải là public key Solana hợp lệ không (bắt đầu với số hoặc chữ và độ dài 32-44 ký tự)
   if (!value || value.trim() === '') {
-    return { valid: false, message: "Public key không được để trống" };
+    return { valid: false, message: "Public key cannot be empty" };
   }
   
   // Kiểm tra định dạng base58
   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
   if (!base58Regex.test(value)) {
-    return { valid: false, message: "Public key không đúng định dạng" };
+    return { valid: false, message: "Public key format is invalid" };
   }
   
   return { valid: true };
@@ -125,7 +125,7 @@ const tokenExtensions: TokenExtensionType[] = [
     id: "metadata",
     icon: FileText,
     name: "Token Metadata",
-    description: "Metadata nhúng trực tiếp vào token (luôn được bật)",
+    description: "Metadata embedded directly into the token (always enabled)",
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
     options: [],
@@ -135,7 +135,7 @@ const tokenExtensions: TokenExtensionType[] = [
     id: "metadata-pointer",
     icon: FileText,
     name: "Metadata Pointer",
-    description: "Liên kết metadata với token (luôn được bật)",
+    description: "Link metadata with token (always enabled)",
     color: "text-pink-400",
     bgColor: "bg-pink-400/10",
     options: [],
@@ -169,7 +169,7 @@ const tokenExtensions: TokenExtensionType[] = [
     bgColor: "bg-blue-400/10",
     options: [],
     disabled: true,
-    disabledReason: "Đang trong giai đoạn phát triển, chưa sẵn sàng sử dụng"
+    disabledReason: "Currently in development, not ready for use yet"
   },
   {
     id: "permanent-delegate",
@@ -338,7 +338,7 @@ export default function CreateToken() {
     
     // Không cho phép chọn extension bị vô hiệu hóa
     if (extension?.disabled) {
-      toast.error(`Không thể sử dụng tính năng ${extension.name}: ${extension.disabledReason}`);
+      toast.error(`Cannot use ${extension.name} feature: ${extension.disabledReason}`);
       return;
     }
     
@@ -360,7 +360,7 @@ export default function CreateToken() {
       const compatibility = isCompatibleExtension(extensionId, selectedExtensions);
       if (!compatibility.compatible) {
         const incompatibleExt = tokenExtensions.find(ext => ext.id === compatibility.incompatibleWith);
-        toast.error(`${extension?.name} không tương thích với ${incompatibleExt?.name} đã được chọn`);
+        toast.error(`${extension?.name} is not compatible with the selected ${incompatibleExt?.name}`);
         return;
       }
       
@@ -416,7 +416,7 @@ export default function CreateToken() {
           ...prev,
           [extensionId]: {
             ...(prev[extensionId] || {}),
-            [optionId]: 'Phí chuyển khoản không được nhỏ hơn 0%'
+            [optionId]: 'Transfer fee cannot be less than 0%'
           }
         }));
       } else if (feePercentage > 10) {
@@ -424,7 +424,7 @@ export default function CreateToken() {
           ...prev,
           [extensionId]: {
             ...(prev[extensionId] || {}),
-            [optionId]: 'Phí chuyển khoản không được lớn hơn 10%'
+            [optionId]: 'Transfer fee cannot be greater than 10%'
           }
         }));
       } else {
@@ -464,7 +464,7 @@ export default function CreateToken() {
             ...prev,
             [extensionId]: {
               ...(prev[extensionId] || {}),
-              [optionId]: validation.message || 'Giá trị không hợp lệ'
+              [optionId]: validation.message || 'Invalid value'
             }
           }))
         }
@@ -500,7 +500,7 @@ export default function CreateToken() {
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
-      setFormErrors({...formErrors, image: "Không thể tải lên ảnh, vui lòng thử lại"});
+      setFormErrors({...formErrors, image: "Could not upload image, please try again"});
     } finally {
       setUploadingImage(false);
     }
@@ -520,43 +520,43 @@ export default function CreateToken() {
     
     // Kiểm tra các trường cơ bản
     if (!tokenData.name.trim()) {
-      basicErrors.name = "Tên token là bắt buộc";
+      basicErrors.name = "Token name is required";
       isValid = false;
     }
     
     if (!tokenData.symbol.trim()) {
-      basicErrors.symbol = "Ký hiệu token là bắt buộc";
+      basicErrors.symbol = "Token symbol is required";
       isValid = false;
     } else if (tokenData.symbol.length > 10) {
-      basicErrors.symbol = "Ký hiệu token không được vượt quá 10 ký tự";
+      basicErrors.symbol = "Token symbol must not exceed 10 characters";
       isValid = false;
     }
     
     if (!tokenData.decimals) {
-      basicErrors.decimals = "Số thập phân là bắt buộc";
+      basicErrors.decimals = "Decimals are required";
       isValid = false;
     } else {
       const decimalsNum = Number(tokenData.decimals);
       if (isNaN(decimalsNum) || decimalsNum < 0 || decimalsNum > 9) {
-        basicErrors.decimals = "Số thập phân phải là số từ 0-9";
+        basicErrors.decimals = "Decimals must be a number between 0-9";
         isValid = false;
       }
     }
     
     if (!tokenData.supply) {
-      basicErrors.supply = "Khối lượng token là bắt buộc";
+      basicErrors.supply = "Token supply is required";
       isValid = false;
     } else {
       const supplyNum = Number(tokenData.supply);
       if (isNaN(supplyNum) || supplyNum <= 0) {
-        basicErrors.supply = "Khối lượng token phải lớn hơn 0";
+        basicErrors.supply = "Token supply must be greater than 0";
         isValid = false;
       }
     }
     
     // Kiểm tra ảnh đã tải lên thành công chưa
     if (!tokenData.imageUrl) {
-      basicErrors.image = "Bạn phải tải lên ảnh cho token";
+      basicErrors.image = "You must upload an image for the token";
       isValid = false;
     }
     
@@ -574,7 +574,7 @@ export default function CreateToken() {
           if (!feeReceiver || (typeof feeReceiver === 'string' && feeReceiver.trim() === '')) {
             errors[extensionId] = {
               ...(errors[extensionId] || {}),
-              "fee-receiver": "Địa chỉ nhận phí là bắt buộc"
+              "fee-receiver": "Fee receiver address is required"
             };
             isValid = false;
           } else {
@@ -583,7 +583,7 @@ export default function CreateToken() {
             if (!validation.valid) {
               errors[extensionId] = {
                 ...(errors[extensionId] || {}),
-                "fee-receiver": validation.message || "Địa chỉ nhận phí không hợp lệ"
+                "fee-receiver": validation.message || "Fee receiver address is invalid"
               };
               isValid = false;
             }
@@ -594,7 +594,7 @@ export default function CreateToken() {
           if (feePercentage === undefined || feePercentage === null) {
             errors[extensionId] = {
               ...(errors[extensionId] || {}),
-              "fee-percentage": "Phần trăm phí là bắt buộc"
+              "fee-percentage": "Fee percentage is required"
             };
             isValid = false;
           } else {
@@ -602,7 +602,7 @@ export default function CreateToken() {
             if (isNaN(percentValue) || percentValue < 0 || percentValue > 10) {
               errors[extensionId] = {
                 ...(errors[extensionId] || {}),
-                "fee-percentage": "Phần trăm phí phải từ 0-10%"
+                "fee-percentage": "Fee percentage must be between 0-10%"
               };
               isValid = false;
             }
@@ -624,7 +624,7 @@ export default function CreateToken() {
             if (!value || (typeof value === 'string' && value.trim() === '')) {
               errors[extensionId] = {
                 ...(errors[extensionId] || {}),
-                [option.id]: `Trường ${textOption.label} là bắt buộc`
+                [option.id]: `${textOption.label} field is required`
               };
               isValid = false;
             }
@@ -634,7 +634,7 @@ export default function CreateToken() {
               if (!validation.valid) {
                 errors[extensionId] = {
                   ...(errors[extensionId] || {}),
-                  [option.id]: validation.message || 'Giá trị không hợp lệ'
+                  [option.id]: validation.message || 'Invalid value'
                 };
                 isValid = false;
               }
@@ -649,9 +649,9 @@ export default function CreateToken() {
     if (!isValid) {
       // Hiển thị thông báo lỗi tổng quan
       if (Object.keys(basicErrors).length > 0) {
-        toast.error("Vui lòng nhập đầy đủ thông tin cơ bản cho token");
+        toast.error("Please enter all required basic information for the token");
       } else {
-        toast.error("Vui lòng nhập đầy đủ thông tin cho các extension đã chọn");
+        toast.error("Please enter all required information for the selected extensions");
       }
     }
     
@@ -841,7 +841,7 @@ export default function CreateToken() {
                           <div className="text-center">
                             <Upload className="mx-auto h-8 w-8 text-gray-400" />
                             <p className="mt-1 text-xs text-gray-400">
-                              {uploadingImage ? "Đang tải..." : "Tải ảnh"}
+                              {uploadingImage ? "Uploading..." : "Upload Image"}
                             </p>
                           </div>
                           <input 
@@ -862,7 +862,7 @@ export default function CreateToken() {
                       {formErrors.image && <p className="text-xs text-red-500 text-center mt-1">{formErrors.image}</p>}
                       {tokenData.imageUrl && (
                         <p className="text-xs text-green-400 text-center mt-1">
-                          Ảnh đã tải lên thành công
+                          Image uploaded successfully
                         </p>
                       )}
                     </div>
@@ -1012,9 +1012,9 @@ export default function CreateToken() {
                                       <div className="flex items-start">
                                         <Info className="w-3 h-3 mr-1 mt-0.5 shrink-0" />
                                         <span>
-                                          Phí chuyển khoản được tính theo phần trăm mỗi khi token được chuyển đi. 
-                                          Khi người dùng thực hiện giao dịch chuyển token, phí sẽ được trừ tự động 
-                                          và gửi đến địa chỉ Fee Receiver được cấu hình.
+                                          Transfer fees are calculated as a percentage each time tokens are transferred.
+                                          When users transfer tokens, fees are automatically deducted and sent to the
+                                          configured Fee Receiver address.
                                         </span>
                                       </div>
                                     </div>

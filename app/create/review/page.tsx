@@ -41,14 +41,14 @@ import { toast } from "sonner"
 import { ipfsToHTTP } from "@/lib/utils/pinata"
 import { createToken } from "@/lib/services/token-service"
 
-// Định nghĩa interface cho kết quả tạo token
+// Define interface for token creation result
 interface TokenCreationResult {
   mint: PublicKey;
   signature: string;
   token: any;
 }
 
-// Định nghĩa kiểu dữ liệu cho token extensions
+// Define types for token extensions
 type TokenExtensionType = {
   id: string
   icon: React.ElementType
@@ -58,7 +58,7 @@ type TokenExtensionType = {
   bgColor: string
 }
 
-// Map từ ID sang thông tin extension
+// Map from ID to extension information
 const tokenExtensionsMap: Record<string, TokenExtensionType> = {
   "transfer-fees": {
     id: "transfer-fees",
@@ -116,7 +116,7 @@ const tokenExtensionsMap: Record<string, TokenExtensionType> = {
     color: "text-pink-600",
     bgColor: "bg-pink-600/10",
   },
-  // Metadata được thêm mặc định, nhưng vẫn giữ lại để hiển thị trong UI review
+  // Metadata is added by default, but kept for display in UI review
   "metadata": {
     id: "metadata",
     icon: FileText,
@@ -127,7 +127,7 @@ const tokenExtensionsMap: Record<string, TokenExtensionType> = {
   }
 }
 
-// Định nghĩa các cặp extensions không tương thích
+// Define incompatible extension pairs
 const incompatibleExtensionPairs: [string, string][] = [
   ["transfer-fees", "non-transferable"],
   ["non-transferable", "transfer-hook"],
@@ -137,7 +137,7 @@ const incompatibleExtensionPairs: [string, string][] = [
   ["confidential-transfer", "non-transferable"]
 ];
 
-// Hàm kiểm tra xem danh sách extensions có tương thích với nhau không
+// Function to check if the list of extensions are compatible with each other
 const checkExtensionsCompatibility = (extensions: string[]): { 
   compatible: boolean; 
   incompatiblePairs?: [string, string][] 
@@ -149,7 +149,7 @@ const checkExtensionsCompatibility = (extensions: string[]): {
       const ext1 = extensions[i];
       const ext2 = extensions[j];
       
-      // Kiểm tra từng cặp extensions
+      // Check each pair of extensions
       const isIncompatible = incompatibleExtensionPairs.some(
         pair => (pair[0] === ext1 && pair[1] === ext2) || 
                 (pair[0] === ext2 && pair[1] === ext1)
@@ -167,7 +167,7 @@ const checkExtensionsCompatibility = (extensions: string[]): {
   };
 };
 
-// Hàm kiểm tra tính đầy đủ thông tin của extensions đã chọn
+// Function to check if all required fields for selected extensions are provided
 const checkExtensionRequiredFields = (extensions: string[], extensionOptions: Record<string, any>): { 
   valid: boolean; 
   missingFields: Record<string, string[]>;
@@ -179,7 +179,7 @@ const checkExtensionRequiredFields = (extensions: string[], extensionOptions: Re
     const extension = tokenExtensionsMap[extensionId];
     if (!extension) continue;
     
-    // Kiểm tra các extension cần có thông tin nhập
+    // Check extensions that require input information
     if (extensionId === "permanent-delegate") {
       const delegateAddress = extensionOptions[extensionId]?.["delegate-address"];
       if (!delegateAddress || typeof delegateAddress !== 'string' || delegateAddress.trim() === '') {
@@ -215,9 +215,9 @@ export default function ReviewToken() {
   const [metadataUri, setMetadataUri] = useState<string>("")
 
   useEffect(() => {
-    // Mô phỏng việc tải dữ liệu
+    // Load data
     const loadData = async () => {
-      // Đọc dữ liệu từ localStorage
+      // Read data from localStorage
       if (typeof window !== 'undefined') {
         const savedData = localStorage.getItem('tokenData')
         if (savedData) {
@@ -237,28 +237,28 @@ export default function ReviewToken() {
           })
           
           if (parsedData.selectedExtensions) {
-            // Thêm "metadata" vào danh sách extension để hiển thị trong review
+            // Add "metadata" to the extension list to display in review
             const extensions = [...parsedData.selectedExtensions];
             if (!extensions.includes("metadata")) {
               extensions.push("metadata");
             }
             
-            // Kiểm tra tính tương thích của các extensions
+            // Check compatibility of extensions
             const compatibility = checkExtensionsCompatibility(extensions);
             if (!compatibility.compatible && compatibility.incompatiblePairs) {
               const incompatibleNames = compatibility.incompatiblePairs.map(pair => {
                 const ext1 = tokenExtensionsMap[pair[0]]?.name || pair[0];
                 const ext2 = tokenExtensionsMap[pair[1]]?.name || pair[1];
-                return `${ext1} và ${ext2}`;
+                return `${ext1} and ${ext2}`;
               }).join(", ");
               
               toast.error(
-                `Phát hiện các extensions không tương thích: ${incompatibleNames}. Vui lòng quay lại trang tạo token và điều chỉnh.`, 
+                `Incompatible extensions detected: ${incompatibleNames}. Please go back to the token creation page and adjust.`, 
                 { duration: 6000 }
               );
             }
             
-            // Kiểm tra thông tin bắt buộc của các extensions
+            // Check required information for selected extensions
             const requiredCheck = checkExtensionRequiredFields(extensions, parsedData.extensionOptions);
             if (!requiredCheck.valid) {
               const missingFieldsInfo = Object.entries(requiredCheck.missingFields)
@@ -268,11 +268,11 @@ export default function ReviewToken() {
                 }).join("; ");
               
               toast.error(
-                `Thiếu thông tin bắt buộc cho các extension: ${missingFieldsInfo}. Vui lòng quay lại trang tạo token và nhập đầy đủ.`,
+                `Missing required information for extensions: ${missingFieldsInfo}. Please go back to the token creation page and complete all fields.`,
                 { duration: 6000 }
               );
               
-              // Quay lại trang tạo token
+              // Go back to token creation page
               setTimeout(() => {
                 router.push('/create');
               }, 3000);
@@ -287,7 +287,7 @@ export default function ReviewToken() {
 
           setIsLoading(false)
         } else {
-          // Không có dữ liệu, quay lại trang tạo
+          // No data, go back to creation page
           router.push('/create')
         }
       }
@@ -307,20 +307,20 @@ export default function ReviewToken() {
       return
     }
     
-    // Kiểm tra tính tương thích của các extensions một lần nữa trước khi tạo token
+    // Check compatibility of extensions again before creating token
     const compatibility = checkExtensionsCompatibility(selectedExtensions);
     if (!compatibility.compatible) {
       const incompatibleNames = compatibility.incompatiblePairs!.map(pair => {
         const ext1 = tokenExtensionsMap[pair[0]]?.name || pair[0];
         const ext2 = tokenExtensionsMap[pair[1]]?.name || pair[1];
-        return `${ext1} và ${ext2}`;
+        return `${ext1} and ${ext2}`;
       }).join(", ");
       
-      toast.error(`Không thể tạo token: Các extensions ${incompatibleNames} không tương thích với nhau`);
+      toast.error(`Cannot create token: The extensions ${incompatibleNames} are not compatible with each other`);
       return;
     }
     
-    // Kiểm tra thông tin bắt buộc của các extensions một lần nữa
+    // Check required information for selected extensions again
     const requiredCheck = checkExtensionRequiredFields(selectedExtensions, tokenData.extensionOptions);
     if (!requiredCheck.valid) {
       const missingFieldsInfo = Object.entries(requiredCheck.missingFields)
@@ -329,11 +329,11 @@ export default function ReviewToken() {
           return `${extName}: ${fields.join(', ')}`;
         }).join("; ");
       
-      toast.error(`Không thể tạo token: Thiếu thông tin bắt buộc cho các extension - ${missingFieldsInfo}`);
+      toast.error(`Cannot create token: Missing required information for extensions - ${missingFieldsInfo}`);
       return;
     }
     
-    // Kiểm tra khả năng ký
+    // Check transaction signing capability
     if (!wallet.signTransaction) {
       toast.error("Wallet does not support transaction signing")
       return
@@ -343,16 +343,16 @@ export default function ReviewToken() {
     setCreationError(null)
     
     try {
-      // Hiển thị thông báo chi tiết về từng bước
-      const toastId1 = toast.loading("Đang chuẩn bị dữ liệu token...");
+      // Display detailed progress notifications
+      const toastId1 = toast.loading("Preparing token data...");
       
-      // Chuẩn bị dữ liệu token với imageUrl
+      // Prepare token data with imageUrl
       const tokenDataWithImage = {
         ...tokenData,
         imageUrl: imageUrl
       };
       
-      // Truyền trực tiếp wallet context vào service
+      // Pass wallet context directly to the service
       const result = await createToken(
         connection,
         wallet,
@@ -361,18 +361,18 @@ export default function ReviewToken() {
       );
       
       toast.dismiss(toastId1);
-      toast.success("Đã tạo token thành công!");
+      toast.success("Token created successfully!");
       
-      // Phần còn lại giữ nguyên
+      // Update state with the result
       setCreatedTokenMint(result.mint);
       setTransactionSignature(result.signature);
       setMetadataUri(result.metadataUri);
       setSuccess(true);
       
-      // Xóa dữ liệu trong localStorage sau khi tạo thành công
+      // Remove data from localStorage after successful creation
       localStorage.removeItem('tokenData');
     } catch (error: any) {
-      // Xử lý các lỗi cụ thể liên quan đến wallet
+      // Handle specific errors related to wallet
       console.error("Detailed token creation error:", error);
       
       let errorMessage = error.message || "Error creating token";
@@ -402,7 +402,7 @@ export default function ReviewToken() {
     router.push('/')
   }
 
-  // Hiển thị loading skeleton khi đang tải dữ liệu
+  // Show loading skeleton when loading data
   if (isLoading || !tokenData) {
     return <PageLoadingSkeleton />
   }
@@ -567,7 +567,7 @@ export default function ReviewToken() {
                 </p>
               </div>
 
-              {/* Hiển thị các liên kết mạng xã hội */}
+              {/* Show social links */}
               {(tokenData.websiteUrl || tokenData.twitterUrl || tokenData.telegramUrl || tokenData.discordUrl) && (
                 <div className="mt-4 pt-4 border-t border-gray-700">
                   <p className="text-gray-400 text-sm mb-3 text-center">Social Links</p>
@@ -739,7 +739,7 @@ export default function ReviewToken() {
                   </p>
                 </div>
 
-                {/* Hiển thị các URL mạng xã hội nếu có */}
+                {/* Show social links if available */}
                 {(tokenData.websiteUrl || tokenData.twitterUrl || tokenData.telegramUrl || tokenData.discordUrl) && (
                   <div className="pt-4">
                     <h3 className="text-sm text-gray-400 mb-3">Social Links</h3>
@@ -913,7 +913,7 @@ export default function ReviewToken() {
   )
 } 
 
-// Hiển thị chi tiết cấu hình extension trong review
+// Show extension details in review
 const renderExtensionDetails = (extId: string, options: any) => {
   if (extId === "permanent-delegate" && options?.["delegate-address"]) {
     return (
