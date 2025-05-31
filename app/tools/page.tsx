@@ -6,9 +6,17 @@ import { CommonLayout } from "@/components/common-layout"
 import { PageLoadingSkeleton } from "@/components/loading-skeleton"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { 
-  Coins, 
-  Settings, 
+  CoinsIcon, 
+  ShieldCheck,
+  Receipt,
+  Wallet,
+  ArrowUpDown,
+  Plus,
+  Flame,
+  Coins,
+  Settings,
   ArrowRight,
   BarChart3,
   Layers,
@@ -16,9 +24,6 @@ import {
   Gem,
   RefreshCw,
   Send,
-  ShieldCheck,
-  Receipt,
-  Wallet
 } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -79,7 +84,7 @@ const tokenTools: TokenTool[] = [
     description: "Claim transfer fees from tokens with Transfer Fee feature",
     icon: <Receipt className="w-8 h-8 text-green-400" />,
     color: "from-green-500/20 to-emerald-500/20",
-    href: "/tools/claim-fees",
+    href: "/tools/claim-fee",
     category: "analytics"
   },
   {
@@ -270,6 +275,39 @@ export default function TokenTools() {
               </div>
               <div className="hidden md:flex justify-end">
                 <Settings className="w-24 h-24 text-purple-400 opacity-60" />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="mb-12"
+        >
+          <Card className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white text-2xl">Claim Fee</CardTitle>
+              <CardDescription className="text-gray-300">
+                Harvest and withdraw transfer fees
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="space-y-4 max-w-2xl">
+                <p className="text-gray-300">
+                  Claim transfer fees from tokens with Transfer Fee feature
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/tools/claim-fees">
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                      Claim Fee
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <div className="hidden md:flex justify-end">
+                <Coins className="w-24 h-24 text-purple-400 opacity-60" />
               </div>
             </CardContent>
           </Card>

@@ -52,7 +52,15 @@ type SliderOptionType = {
   defaultValue: number
 }
 
-type OptionType = TextOptionType | SliderOptionType
+type SelectOptionType = {
+  id: string
+  label: string
+  type: "select"
+  options: Array<{value: string, label: string}>
+  defaultValue: string
+}
+
+type OptionType = TextOptionType | SliderOptionType | SelectOptionType
 
 type TokenExtensionType = {
   id: string
@@ -223,7 +231,25 @@ const tokenExtensions: TokenExtensionType[] = [
     description: "Set default state for all accounts of this token",
     color: "text-cyan-400",
     bgColor: "bg-cyan-400/10",
-    options: []
+    options: [
+      { 
+        id: "state", 
+        label: "Default State", 
+        type: "select", 
+        options: [
+          { value: "initialized", label: "Initialized (Normal)" },
+          { value: "frozen", label: "Frozen" }
+        ],
+        defaultValue: "initialized"
+      },
+      {
+        id: "freeze-authority",
+        label: "Freeze Authority Address",
+        type: "text",
+        placeholder: "Enter freeze authority public key (defaults to your wallet)",
+        validator: validatePublicKey
+      }
+    ]
   },
   {
     id: "mint-close-authority",
@@ -290,6 +316,26 @@ const ExtensionOptionInput = ({
           defaultValue={[Number(value || (option as SliderOptionType).defaultValue)]}
           onValueChange={(value) => onChange(value[0])}
         />
+      </div>
+    );
+  }
+  
+  if (option.type === 'select') {
+    const selectOption = option as SelectOptionType;
+    return (
+      <div className="space-y-1">
+        <select
+          className={`w-full bg-gray-800 border border-gray-700 text-white rounded-md h-9 px-3 ${error ? 'border-red-500' : ''}`}
+          value={value?.toString() || selectOption.defaultValue}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {selectOption.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
     );
   }

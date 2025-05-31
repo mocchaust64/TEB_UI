@@ -1,5 +1,12 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { 
+  TOKEN_2022_PROGRAM_ID, 
+  TOKEN_PROGRAM_ID,
+  getAccount, 
+  getMint,
+  getExtensionData,
+  ExtensionType
+} from "@solana/spl-token";
 import { TokenItem as BaseTokenItem } from "../services/tokenList";
 
 // Extend TokenItem interface to include details property
@@ -274,4 +281,97 @@ export function getExtensionSummary(extensionInfo: TokenExtensionInfo): string {
   if (extensions.length === 0) return 'No extensions';
   
   return extensions.join(', ');
+}
+
+/**
+ * Kiểm tra xem token có extension cụ thể không
+ * @param connection - Kết nối Solana 
+ * @param mintAddress - Địa chỉ mint của token
+ * @param extensionType - Loại extension cần kiểm tra (từ ExtensionType enum)
+ * @returns Boolean chỉ ra token có extension đó hay không
+ */
+export async function hasTokenExtension(
+  connection: Connection, 
+  mintAddress: string,
+  extensionType: ExtensionType
+): Promise<boolean> {
+  try {
+    // Chuyển đổi địa chỉ mint thành PublicKey
+    const mintPubkey = new PublicKey(mintAddress);
+
+    // Kiểm tra token có phải là Token-2022 không
+    const accountInfo = await connection.getAccountInfo(mintPubkey);
+    if (!accountInfo || !accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)) {
+      return false; // Không phải Token-2022, không thể có extension
+    }
+
+    // Lấy thông tin mint từ Token-2022 program
+    const mintInfo = await getMint(
+      connection,
+      mintPubkey,
+      'confirmed',
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // Kiểm tra có extension này trong TLV data không
+    try {
+      const extensionData = getExtensionData(
+        extensionType,
+        mintInfo.tlvData
+      );
+      
+      return !!extensionData; // Trả về true nếu tìm thấy dữ liệu extension
+    } catch (error) {
+      console.log(`Extension ${extensionType} not found in TLV data`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error checking extension ${extensionType}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Kiểm tra người dùng có quyền đóng băng token hay không
+ * @param connection - Kết nối Solana
+ * @param mintAddress - Địa chỉ mint của token
+ * @param walletAddress - Địa chỉ ví của người dùng
+ * @returns Boolean chỉ ra người dùng có quyền đóng băng hay không
+ */
+export async function checkFreezeAuthority(
+  connection: Connection,
+  mintAddress: string,
+  walletAddress: string
+): Promise<boolean> {
+  try {
+    const mintInfo = await connection.getAccountInfo(new PublicKey(mintAddress));
+    
+    if (!mintInfo) return false;
+    
+    // Kiểm tra mint thuộc token program nào
+    const programId = mintInfo.owner;
+    const isToken2022 = programId.equals(TOKEN_2022_PROGRAM_ID);
+    
+    // Lấy thông tin chi tiết của mint
+    const mintPubkey = new PublicKey(mintAddress);
+    const walletPubkey = new PublicKey(walletAddress);
+    
+    // Sử dụng getMint để lấy thông tin đầy đủ về mint
+    const mint = await getMint(
+      connection,
+      mintPubkey,
+      'confirmed',
+      isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID
+    );
+    
+    // Kiểm tra xem ví có phải là freeze authority không
+    if (mint.freezeAuthority && mint.freezeAuthority.equals(walletPubkey)) {
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Error checking freeze authority:", error);
+    return false;
+  }
 } 

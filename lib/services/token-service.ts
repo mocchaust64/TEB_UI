@@ -226,7 +226,7 @@ export async function createToken(
   const tokenBuilder = new TokenBuilder(enhancedConnection)
     .setTokenInfo(
       decimals,
-      wallet.publicKey
+      wallet.publicKey  // Mint authority
     )
     .addTokenMetadata(
       tokenData.name,
@@ -282,6 +282,19 @@ export async function createToken(
     else if (extensionId === "mint-close-authority" && tokenData.extensionOptions?.["mint-close-authority"]) {
       const closeAuthorityAddress = new PublicKey(tokenData.extensionOptions["mint-close-authority"]["close-authority"] || wallet.publicKey.toString());
       tokenBuilder.addMintCloseAuthority(closeAuthorityAddress);
+    }
+    else if (extensionId === "default-account-state") {
+      // Thêm xử lý cho DefaultAccountState extension
+      // Lấy giá trị từ options nếu có, mặc định là Initialized (0)
+      const defaultState = tokenData.extensionOptions?.["default-account-state"]?.["state"] === "frozen" ? 1 : 0;
+      
+      // Lấy freeze authority nếu có, mặc định là ví người dùng
+      const freezeAuthority = tokenData.extensionOptions?.["default-account-state"]?.["freeze-authority"] 
+        ? new PublicKey(tokenData.extensionOptions["default-account-state"]["freeze-authority"])
+        : wallet.publicKey;
+      
+      // Truyền cả state và freezeAuthority vào addDefaultAccountState
+      tokenBuilder.addDefaultAccountState(defaultState, freezeAuthority);
     }
     // Có thể thêm các extension khác ở đây
   }
@@ -781,6 +794,175 @@ export async function burnToken(
     return signature;
   } catch (error) {
     console.error("Error burning token:", error);
+    throw error;
+  }
+}
+
+/**
+ * Đóng băng tài khoản token
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param tokenAccount Địa chỉ tài khoản token cần đóng băng
+ * @param mintAddress Địa chỉ mint của token
+ * @returns Signature của giao dịch
+ */
+export async function freezeTokenAccount(
+  connection: Connection,
+  wallet: WalletContextState,
+  tokenAccount: string,
+  mintAddress: string
+): Promise<string> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+
+  try {
+    // Sử dụng TokenFreezeExtension từ solana-token-extension-boost
+    const { TokenFreezeExtension } = await import("solana-token-extension-boost");
+    
+    // Tạo transaction đóng băng tài khoản token
+    const transaction = TokenFreezeExtension.prepareFreezeAccountTransaction(
+      new PublicKey(tokenAccount),
+      new PublicKey(mintAddress),
+      wallet.publicKey,
+      wallet.publicKey
+    );
+    
+    // Lấy blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    
+    // Gửi và xác nhận transaction
+    const signature = await wallet.sendTransaction(
+      transaction,
+      connection,
+      { skipPreflight: false }
+    );
+    
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature
+    }, 'confirmed');
+    
+    return signature;
+  } catch (error) {
+    console.error("Error freezing token account:", error);
+    throw error;
+  }
+}
+
+/**
+ * Mở đóng băng tài khoản token
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param tokenAccount Địa chỉ tài khoản token cần mở đóng băng
+ * @param mintAddress Địa chỉ mint của token
+ * @returns Signature của giao dịch
+ */
+export async function thawTokenAccount(
+  connection: Connection,
+  wallet: WalletContextState,
+  tokenAccount: string,
+  mintAddress: string
+): Promise<string> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+
+  try {
+    // Sử dụng TokenFreezeExtension từ solana-token-extension-boost
+    const { TokenFreezeExtension } = await import("solana-token-extension-boost");
+    
+    // Tạo transaction mở đóng băng tài khoản token
+    const transaction = TokenFreezeExtension.prepareThawAccountTransaction(
+      new PublicKey(tokenAccount),
+      new PublicKey(mintAddress),
+      wallet.publicKey,
+      wallet.publicKey
+    );
+    
+    // Lấy blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    
+    // Gửi và xác nhận transaction
+    const signature = await wallet.sendTransaction(
+      transaction,
+      connection,
+      { skipPreflight: false }
+    );
+    
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature
+    }, 'confirmed');
+    
+    return signature;
+  } catch (error) {
+    console.error("Error thawing token account:", error);
+    throw error;
+  }
+}
+
+/**
+ * Cập nhật trạng thái mặc định của token (DefaultAccountState)
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param mintAddress Địa chỉ mint của token
+ * @param state Trạng thái mặc định mới (0: Initialized, 1: Frozen)
+ * @returns Signature của giao dịch
+ */
+export async function updateDefaultAccountState(
+  connection: Connection,
+  wallet: WalletContextState,
+  mintAddress: string,
+  state: number // 0: Initialized, 1: Frozen
+): Promise<string> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+
+  try {
+    // Sử dụng TokenFreezeExtension từ solana-token-extension-boost
+    const { TokenFreezeExtension } = await import("solana-token-extension-boost");
+    const { AccountState } = await import("@solana/spl-token");
+    
+    // Chuyển đổi state thành AccountState
+    const accountState = state === 1 ? AccountState.Frozen : AccountState.Initialized;
+    
+    // Tạo transaction cập nhật trạng thái mặc định
+    const transaction = TokenFreezeExtension.prepareUpdateDefaultAccountStateTransaction(
+      new PublicKey(mintAddress),
+      accountState,
+      wallet.publicKey,
+      wallet.publicKey
+    );
+    
+    // Lấy blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    
+    // Gửi và xác nhận transaction
+    const signature = await wallet.sendTransaction(
+      transaction,
+      connection,
+      { skipPreflight: false }
+    );
+    
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature
+    }, 'confirmed');
+    
+    return signature;
+  } catch (error) {
+    console.error("Error updating default account state:", error);
     throw error;
   }
 }
