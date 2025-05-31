@@ -285,8 +285,8 @@ export async function createToken(
     }
     else if (extensionId === "default-account-state") {
       // Thêm xử lý cho DefaultAccountState extension
-      // Lấy giá trị từ options nếu có, mặc định là Initialized (0)
-      const defaultState = tokenData.extensionOptions?.["default-account-state"]?.["state"] === "frozen" ? 1 : 0;
+      // Luôn sử dụng trạng thái frozen (1)
+      const defaultState = 1; // Mặc định luôn là frozen
       
       // Lấy freeze authority nếu có, mặc định là ví người dùng
       const freezeAuthority = tokenData.extensionOptions?.["default-account-state"]?.["freeze-authority"] 

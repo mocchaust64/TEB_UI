@@ -228,20 +228,10 @@ const tokenExtensions: TokenExtensionType[] = [
     id: "default-account-state",
     icon: Shield,
     name: "Default Account State",
-    description: "Set default state for all accounts of this token",
+    description: "Set default state for all accounts of this token (always frozen)",
     color: "text-cyan-400",
     bgColor: "bg-cyan-400/10",
     options: [
-      { 
-        id: "state", 
-        label: "Default State", 
-        type: "select", 
-        options: [
-          { value: "initialized", label: "Initialized (Normal)" },
-          { value: "frozen", label: "Frozen" }
-        ],
-        defaultValue: "initialized"
-      },
       {
         id: "freeze-authority",
         label: "Freeze Authority Address",

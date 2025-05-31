@@ -58,12 +58,6 @@ export default function Hero() {
                 Token Portfolio
               </Button>
               </Link>
-              <Link href="/manage">
-              <Button size="lg" variant="outline" className="text-white border-purple-500 hover:bg-purple-500/20">
-                <Settings className="mr-2 h-5 w-5" />
-                Manage Tokens
-              </Button>
-              </Link>
             </motion.div>
 
             <motion.div
