@@ -651,9 +651,9 @@ async function getTokenTransactions(connection: Connection, walletAddress: Publi
                     type = 'send';
                     console.log(`  Transaction type: send`);
                   } else {
-                    // Even if not directly related to wallet, still show the transaction
-                    type = 'other';
-                    console.log(`  Transaction type: other (not directly related to connected wallet)`);
+                    // Skip transactions not directly related to wallet
+                    found = false;
+                    console.log(`  Transaction type: skipped (not directly related to connected wallet)`);
                   }
                 }
               }
