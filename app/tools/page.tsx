@@ -12,17 +12,13 @@ import {
   ShieldCheck,
   Receipt,
   Wallet,
-  ArrowUpDown,
   Plus,
   Flame,
   Coins,
   Settings,
   ArrowRight,
-  BarChart3,
   Layers,
-  ScanLine,
   Gem,
-  RefreshCw,
   Send,
   Key,
   FileEdit,
@@ -30,7 +26,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "react-hot-toast"
 
 // Định nghĩa kiểu dữ liệu cho tool
 interface TokenTool {
@@ -125,56 +120,13 @@ const tokenTools: TokenTool[] = [
     color: "from-green-500/20 to-emerald-500/20",
     href: "/tools/claim-fee",
     category: "analytics"
-  },
-  {
-    id: "swap",
-    name: "Swap Token",
-    description: "Exchange your tokens with other tokens",
-    icon: <RefreshCw className="w-8 h-8 text-yellow-400" />,
-    color: "from-yellow-500/20 to-amber-500/20",
-    href: "/tools/swap",
-    category: "exchange"
-  },
-  {
-    id: "analytics",
-    name: "Token Analytics",
-    description: "View analytics data and performance metrics for tokens",
-    icon: <BarChart3 className="w-8 h-8 text-violet-400" />,
-    color: "from-violet-500/20 to-indigo-500/20",
-    href: "/tools/analytics",
-    category: "analytics"
-  },
-  {
-    id: "scan",
-    name: "Scan Token",
-    description: "Scan and verify tokens using address or QR code",
-    icon: <ScanLine className="w-8 h-8 text-pink-400" />,
-    color: "from-pink-500/20 to-rose-500/20",
-    href: "/tools/scan",
-    category: "analytics"
-  },
+  }
 ];
 
 // Component cho mỗi card công cụ - tách ra để tránh re-render không cần thiết
 const ToolCard: React.FC<{ tool: TokenTool }> = ({ tool }) => {
-  const handleToolClick = (e: React.MouseEvent, toolId: string) => {
-    // Kiểm tra xem tool này có phải là một trong các công cụ đang phát triển không
-    if (toolId === "swap" || toolId === "analytics" || toolId === "scan") {
-      e.preventDefault();
-      toast("This feature is currently under development. Please check back later!", {
-        duration: 4000,
-        style: {
-          background: '#1E293B',
-          color: '#fff',
-          border: '1px solid #475569',
-        },
-        icon: '🚧',
-      });
-    }
-  };
-
   return (
-    <Link href={tool.href} onClick={(e) => handleToolClick(e, tool.id)}>
+    <Link href={tool.href}>
       <Card className="bg-gray-900/50 border-gray-700 hover:border-purple-500/50 h-full relative">
         <div className={`absolute inset-0 bg-gradient-to-br ${tool.color} opacity-10 hover:opacity-20 transition-opacity duration-300`}></div>
         <CardHeader>
@@ -258,9 +210,6 @@ export default function TokenTools() {
               <TabsTrigger value="analytics" className="data-[state=active]:bg-gray-700">
                 Analytics
               </TabsTrigger>
-              <TabsTrigger value="exchange" className="data-[state=active]:bg-gray-700">
-                Exchange
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="mt-0">
@@ -273,10 +222,6 @@ export default function TokenTools() {
 
             <TabsContent value="analytics" className="mt-0">
               <ToolsGrid tools={tokenTools.filter(tool => tool.category === "analytics")} />
-            </TabsContent>
-
-            <TabsContent value="exchange" className="mt-0">
-              <ToolsGrid tools={tokenTools.filter(tool => tool.category === "exchange")} />
             </TabsContent>
           </Tabs>
         </motion.div>

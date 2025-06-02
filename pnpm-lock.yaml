@@ -171,8 +171,8 @@ importers:
         specifier: 2.15.0
         version: 2.15.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       solana-token-extension-boost:
-        specifier: 3.3.0
-        version: 3.3.0(@metaplex-foundation/umi@1.2.0)(arweave@1.15.7)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(utf-8-validate@5.0.10)
+        specifier: 3.3.1
+        version: 3.3.1(@metaplex-foundation/umi@1.2.0)(arweave@1.15.7)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(utf-8-validate@5.0.10)
       sonner:
         specifier: ^1.7.1
         version: 1.7.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -5286,8 +5286,8 @@ packages:
     resolution: {integrity: sha512-D3YaD0aRxR3mEcqnidIs7ReYJFVzWdd6fXJYUM8ixcQcJRGTka/b3saV0KflYhyVJXKhb947GndU35SxYNResQ==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
 
-  solana-token-extension-boost@3.3.0:
-    resolution: {integrity: sha512-faRnmBD5u3oKXDpGUb5tXXJQQAiTzYCN8l4J8DDXiPBi5jbPB4bHcJkLoxbmqUSJvaC4alPKT9REhIdEMloApQ==}
+  solana-token-extension-boost@3.3.1:
+    resolution: {integrity: sha512-5Ua7C6boSm3V2KqN7HQh0nhpxMrVZ3APBrVQWC5iUl47Whhl+ZUU5FmUdyzjKjc4gjUWyyIt5/kVmadLE4CKsg==}
 
   sonic-boom@2.8.0:
     resolution: {integrity: sha512-kuonw1YOYYNOve5iHdSahXPOK49GqwA+LZhI6Wz/l0rP57iKyXXIHaRagOBHAPmGwJC6od2Z9zgvZ5loSgMlVg==}
@@ -13139,7 +13139,7 @@ snapshots:
       ip-address: 9.0.5
       smart-buffer: 4.2.0
 
-  solana-token-extension-boost@3.3.0(@metaplex-foundation/umi@1.2.0)(arweave@1.15.7)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(utf-8-validate@5.0.10):
+  solana-token-extension-boost@3.3.1(@metaplex-foundation/umi@1.2.0)(arweave@1.15.7)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(utf-8-validate@5.0.10):
     dependencies:
       '@metaplex-foundation/js': 0.20.1(arweave@1.15.7)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(utf-8-validate@5.0.10)
       '@metaplex-foundation/mpl-token-metadata': 3.4.0(@metaplex-foundation/umi@1.2.0)

@@ -916,11 +916,17 @@ export default function ReviewToken() {
 // Show extension details in review
 const renderExtensionDetails = (extId: string, options: any) => {
   if (extId === "permanent-delegate" && options?.["delegate-address"]) {
+    const address = options["delegate-address"];
+    // Rút gọn địa chỉ để hiển thị đẹp hơn
+    const truncatedAddress = address.length > 20 ? 
+      `${address.substring(0, 10)}...${address.substring(address.length - 6)}` : address;
+    
     return (
       <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
-        <div className="flex">
-          <span className="text-gray-500 w-24">Address:</span>
-          <span className="text-gray-300 truncate font-mono">{options["delegate-address"]}</span>
+        <div className="flex flex-col">
+          <span className="text-gray-500">Address:</span>
+          <span className="text-gray-300 font-mono break-all mt-1" title={address}>{truncatedAddress}</span>
+          <span className="text-gray-500 text-[10px] mt-1">Hover to see full address</span>
         </div>
       </div>
     );
@@ -949,11 +955,17 @@ const renderExtensionDetails = (extId: string, options: any) => {
   }
   
   if (extId === "mint-close-authority" && options?.["close-authority"]) {
+    const address = options["close-authority"];
+    // Rút gọn địa chỉ để hiển thị đẹp hơn
+    const truncatedAddress = address.length > 20 ? 
+      `${address.substring(0, 10)}...${address.substring(address.length - 6)}` : address;
+    
     return (
       <div className="text-xs text-gray-400 mt-2 pl-2 border-l-2 border-gray-700">
-        <div className="flex">
-          <span className="text-gray-500 w-24">Authority:</span>
-          <span className="text-gray-300 truncate font-mono">{options["close-authority"]}</span>
+        <div className="flex flex-col">
+          <span className="text-gray-500">Authority:</span>
+          <span className="text-gray-300 font-mono break-all mt-1" title={address}>{truncatedAddress}</span>
+          <span className="text-gray-500 text-[10px] mt-1">Hover to see full address</span>
         </div>
       </div>
     );
