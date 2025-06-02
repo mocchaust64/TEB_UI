@@ -52,7 +52,7 @@ export default function MintToken() {
   const [isError, setIsError] = useState(false);
   const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
   
-  // Lấy wallet và connection
+  // Get wallet and connection
   const wallet = useWallet();
   const { publicKey, connected } = wallet;
   const { connection } = useConnection();
@@ -61,14 +61,14 @@ export default function MintToken() {
     setIsMounted(true);
   }, []);
   
-  // Load tokens khi wallet kết nối
+  // Load tokens when wallet connects
   useEffect(() => {
     if (isMounted && connected && publicKey && connection) {
       loadTokens(false);
     }
   }, [isMounted, connected, publicKey, connection]);
   
-  // Cập nhật token hiện tại khi chọn token
+  // Update current token when selection changes
   useEffect(() => {
     if (selectedToken && tokens.length > 0) {
       const token = tokens.find(t => t.id === selectedToken);
@@ -78,7 +78,7 @@ export default function MintToken() {
     }
   }, [selectedToken, tokens]);
   
-  // Hàm load tokens từ blockchain
+  // Function to load tokens from blockchain
   const loadTokens = async (forceRefresh = false) => {
     if (!publicKey || !connection || !wallet) return;
     
@@ -96,12 +96,12 @@ export default function MintToken() {
       });
       
       if (userTokens) {
-        // Lọc chỉ lấy các token mà người dùng có quyền mint
-        // Trong một ứng dụng thực tế, bạn cần kiểm tra quyền mint authority
-        // Tạm thời, giả định tất cả token đều có quyền mint
+        // Filter tokens where user has mint authority
+        // In a real app, you would need to check mint authority
+        // For now, assume all tokens have mint permissions
         const mintableTokens = userTokens.map(token => ({
           ...token,
-          mintAuthority: true // Tạm thời giả định tất cả đều có quyền mint
+          mintAuthority: true // Temporary assumption that all have mint rights
         })) as TokenItemWithDetails[];
         
         setTokens(mintableTokens);
@@ -109,29 +109,29 @@ export default function MintToken() {
     } catch (error) {
       console.error("Error loading tokens:", error);
       setIsError(true);
-      toast.error("Không thể tải danh sách token");
+      toast.error("Could not load token list");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
   
-  // Hàm làm mới token
+  // Function to refresh tokens
   const handleRefreshTokens = () => {
     loadTokens(true);
   };
   
-  // Hàm mint token
+  // Function to mint token
   const handleMint = async () => {
     if (!currentToken || !amount || !connection || !publicKey) {
-      toast.error("Vui lòng điền đầy đủ thông tin");
+      toast.error("Please fill in all required information");
       return;
     }
     
-    // Kiểm tra số lượng
+    // Check amount
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      toast.error("Số lượng không hợp lệ");
+      toast.error("Invalid amount");
       return;
     }
     
@@ -149,10 +149,10 @@ export default function MintToken() {
       );
       
       setTransactionSignature(signature);
-      toast.success("Đúc token thành công!");
+      toast.success("Token minted successfully!");
     } catch (error) {
       console.error("Error minting token:", error);
-      toast.error("Có lỗi xảy ra khi đúc token");
+      toast.error("An error occurred while minting the token");
     } finally {
       setIsProcessing(false);
     }
@@ -186,7 +186,7 @@ export default function MintToken() {
             className="text-gray-400 hover:text-white p-0 flex items-center gap-1"
             onClick={() => router.push("/tools")}
           >
-            <ArrowLeft className="h-4 w-4" /> Quay lại
+            <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </div>
       
@@ -200,10 +200,10 @@ export default function MintToken() {
             <Gem className="w-8 h-8 text-blue-400" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            Đúc Token
+            Mint Token
           </h1>
           <p className="text-gray-400 text-lg max-w-xl text-center">
-            Đúc thêm token vào lượng cung lưu hành (cần quyền Mint Authority)
+            Mint additional tokens into circulation (requires Mint Authority)
           </p>
         </motion.div>
         
@@ -217,9 +217,9 @@ export default function MintToken() {
             <Card className="bg-gray-900/50 border-gray-700">
               <CardContent className="p-8 flex flex-col items-center justify-center text-center">
                 <Gem className="w-12 h-12 text-gray-500 mb-4" />
-                <h3 className="text-white text-xl font-medium mb-2">Kết nối ví của bạn</h3>
+                <h3 className="text-white text-xl font-medium mb-2">Connect Your Wallet</h3>
                 <p className="text-gray-400 mb-6">
-                  Bạn cần kết nối ví Solana để đúc token
+                  You need to connect your Solana wallet to mint tokens
                 </p>
                 <WalletButton />
               </CardContent>
@@ -244,9 +244,9 @@ export default function MintToken() {
                     <polyline points="22 4 12 14.01 9 11.01"/>
                   </svg>
                 </div>
-                <h3 className="text-white text-xl font-medium mb-2">Đúc token thành công!</h3>
+                <h3 className="text-white text-xl font-medium mb-2">Token Minted Successfully!</h3>
                 <p className="text-gray-400 mb-4">
-                  Giao dịch đã được xác nhận trên blockchain
+                  Transaction has been confirmed on the blockchain
                 </p>
                 <div className="bg-gray-800/50 rounded-md p-3 w-full mb-4">
                   <p className="text-sm text-gray-400 mb-1">Signature</p>
@@ -260,7 +260,7 @@ export default function MintToken() {
                   >
                     <Button variant="outline" className="flex items-center gap-1">
                       <ExternalLink className="w-4 h-4" />
-                      Xem trên Explorer
+                      View on Explorer
                     </Button>
                   </Link>
                   <Button 
@@ -271,7 +271,7 @@ export default function MintToken() {
                       loadTokens(true);
                     }}
                   >
-                    Đúc tiếp
+                    Mint More
                   </Button>
                 </div>
               </CardContent>
@@ -281,9 +281,9 @@ export default function MintToken() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-white text-xl">Chi tiết đúc token</CardTitle>
+                    <CardTitle className="text-white text-xl">Mint Details</CardTitle>
                     <CardDescription className="text-gray-400">
-                      Điền thông tin chi tiết để đúc thêm token
+                      Fill in the details to mint additional tokens
                     </CardDescription>
                   </div>
                   <Button 
@@ -300,50 +300,50 @@ export default function MintToken() {
               <CardContent className="space-y-4">
                 <Alert className="bg-blue-900/20 border-blue-700 text-blue-100">
                   <Info className="h-4 w-4 text-blue-400" />
-                  <AlertTitle>Thông tin quan trọng</AlertTitle>
+                  <AlertTitle>Important Information</AlertTitle>
                   <AlertDescription className="text-blue-200">
-                    Bạn chỉ có thể đúc token nếu bạn có quyền Mint Authority đối với token đó.
+                    You can only mint tokens if you have the Mint Authority for that token.
                   </AlertDescription>
                 </Alert>
 
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-8">
                     <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-                    <p className="text-gray-400">Đang tải danh sách token...</p>
+                    <p className="text-gray-400">Loading token list...</p>
                   </div>
                 ) : isError ? (
                   <div className="flex flex-col items-center justify-center py-8">
                     <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
-                    <p className="text-white text-lg font-medium mb-2">Không thể tải token</p>
-                    <p className="text-gray-400 mb-4">Có lỗi xảy ra khi tải danh sách token</p>
+                    <p className="text-white text-lg font-medium mb-2">Could not load tokens</p>
+                    <p className="text-gray-400 mb-4">An error occurred while loading the token list</p>
                     <Button 
                       variant="outline" 
                       className="border-gray-600 text-white"
                       onClick={() => loadTokens(true)}
                     >
-                      Thử lại
+                      Try Again
                     </Button>
                   </div>
                 ) : tokens.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8">
                     <Gem className="w-10 h-10 text-gray-500 mb-4" />
-                    <p className="text-white text-lg font-medium mb-2">Không có token</p>
-                    <p className="text-gray-400 mb-4">Bạn không có token nào để đúc</p>
+                    <p className="text-white text-lg font-medium mb-2">No Tokens Found</p>
+                    <p className="text-gray-400 mb-4">You don't have any tokens to mint</p>
                     <Button 
                       variant="outline" 
                       className="border-gray-600 text-white"
                       onClick={() => router.push("/create")}
                     >
-                      Tạo token mới
+                      Create New Token
                     </Button>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-2">
-                      <Label htmlFor="token" className="text-white">Chọn Token</Label>
+                      <Label htmlFor="token" className="text-white">Select Token</Label>
                       <Select value={selectedToken} onValueChange={setSelectedToken}>
                         <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
-                          <SelectValue placeholder="Chọn token để đúc" />
+                          <SelectValue placeholder="Select a token to mint" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {tokens.map((token) => (
@@ -368,7 +368,7 @@ export default function MintToken() {
                                 </div>
                                 <span>{token.name} ({token.symbol})</span>
                                 {!token.mintAuthority && (
-                                  <span className="ml-2 text-red-400 text-xs">Không có quyền đúc</span>
+                                  <span className="ml-2 text-red-400 text-xs">No mint authority</span>
                                 )}
                               </div>
                             </SelectItem>
@@ -380,38 +380,38 @@ export default function MintToken() {
                     {currentToken && (
                       <div className="bg-gray-800/40 rounded-md p-3">
                         <div className="flex justify-between items-center mb-2">
-                          <p className="text-sm text-gray-400">Số dư hiện tại</p>
+                          <p className="text-sm text-gray-400">Current Balance</p>
                           <p className="text-white font-medium">{parseFloat(currentToken.balance).toLocaleString()} {currentToken.symbol}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                          <p className="text-sm text-gray-400">Quyền mint</p>
+                          <p className="text-sm text-gray-400">Mint Authority</p>
                           <p className="text-green-400 font-medium">
-                            {currentToken.mintAuthority ? "Có" : "Không"}
+                            {currentToken.mintAuthority ? "Yes" : "No"}
                           </p>
                         </div>
                       </div>
                     )}
                     
                     <div className="space-y-2">
-                      <Label htmlFor="recipient" className="text-white">Địa chỉ người nhận</Label>
+                      <Label htmlFor="recipient" className="text-white">Recipient Address</Label>
                       <Input
                         id="recipient"
-                        placeholder="Địa chỉ ví Solana (Pubkey) hoặc để trống để đúc cho chính bạn"
+                        placeholder="Solana wallet address (Pubkey) or leave empty to mint to yourself"
                         className="bg-gray-800/70 border-gray-700 text-white"
                         value={recipientAddress}
                         onChange={(e) => setRecipientAddress(e.target.value)}
                       />
                       <p className="text-xs text-gray-400">
-                        Để trống để đúc token vào ví của bạn
+                        Leave empty to mint tokens to your own wallet
                       </p>
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="amount" className="text-white">Số lượng</Label>
+                      <Label htmlFor="amount" className="text-white">Amount</Label>
                       <Input
                         id="amount"
                         type="text"
-                        placeholder="Nhập số lượng token muốn đúc"
+                        placeholder="Enter amount of tokens to mint"
                         className="bg-gray-800/70 border-gray-700 text-white"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
@@ -422,7 +422,7 @@ export default function MintToken() {
                     
                     {currentToken && amount && (
                       <div className="rounded-md p-3">
-                        <p className="text-sm text-gray-400 mb-1">Tổng cung sau khi đúc</p>
+                        <p className="text-sm text-gray-400 mb-1">Total Supply After Minting</p>
                         <p className="text-white font-medium text-lg">
                           {amount 
                             ? (parseFloat(currentToken.balance) + parseFloat(amount || "0")).toLocaleString()
@@ -442,17 +442,17 @@ export default function MintToken() {
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
                     </>
                   ) : (
                     <>
-                      <Gem className="mr-2 h-4 w-4" /> Đúc Token
+                      <Gem className="mr-2 h-4 w-4" /> Mint Token
                     </>
                   )}
                 </Button>
                 
                 <p className="text-xs text-gray-400 text-center">
-                  Giao dịch đúc token sẽ được xác nhận thông qua ví đã kết nối của bạn.
+                  The token minting transaction will be confirmed through your connected wallet.
                 </p>
               </CardFooter>
             </Card>

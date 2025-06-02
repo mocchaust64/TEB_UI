@@ -10,7 +10,24 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Solana Token Manager - Manage Token Extensions",
   description: "Comprehensive tool for creating and managing tokens with extension features on Solana",
-    generator: 'v0.dev'
+  icons: {
+    icon: [
+      {
+        url: '/favicon.ico',
+        sizes: 'any'
+      },
+      {
+        url: '/icon.png',
+        type: 'image/png',
+        sizes: '32x32'
+      }
+    ],
+    apple: {
+      url: '/apple-icon.png',
+      sizes: '180x180',
+      type: 'image/png'
+    }
+  }
 }
 
 export default function RootLayout({
@@ -21,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <style>
           {`
             /* Ẩn thông báo lỗi 429 từ Next.js */
