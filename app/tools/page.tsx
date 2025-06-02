@@ -24,6 +24,9 @@ import {
   Gem,
   RefreshCw,
   Send,
+  Key,
+  FileEdit,
+  XCircle
 } from "lucide-react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,12 +46,48 @@ interface TokenTool {
 // Dữ liệu các công cụ token
 const tokenTools: TokenTool[] = [
   {
+    id: "create-token",
+    name: "Create Token",
+    description: "Create a new token with customizable extensions",
+    icon: <Plus className="w-8 h-8 text-emerald-400" />,
+    color: "from-emerald-500/20 to-teal-500/20",
+    href: "/create",
+    category: "management"
+  },
+  {
     id: "transfer",
     name: "Transfer Token",
     description: "Transfer tokens to other wallet addresses on Solana network",
     icon: <Send className="w-8 h-8 text-purple-400" />,
     color: "from-purple-500/20 to-pink-500/20",
     href: "/tools/transfer",
+    category: "management"
+  },
+  {
+    id: "delegate-transfer",
+    name: "Permanent Delegate Recovery",
+    description: "Recover tokens from other wallets using Permanent Delegate authority",
+    icon: <Key className="w-8 h-8 text-indigo-400" />,
+    color: "from-indigo-500/20 to-blue-500/20",
+    href: "/tools/permanent-delegate-recovery",
+    category: "management"
+  },
+  {
+    id: "update-metadata",
+    name: "Update Metadata",
+    description: "Update token metadata and information",
+    icon: <FileEdit className="w-8 h-8 text-amber-400" />,
+    color: "from-amber-500/20 to-yellow-500/20",
+    href: "/tools/update-metadata",
+    category: "management"
+  },
+  {
+    id: "close-mint",
+    name: "Close Mint",
+    description: "Close token mint authority permanently",
+    icon: <XCircle className="w-8 h-8 text-rose-400" />,
+    color: "from-rose-500/20 to-red-500/20",
+    href: "/tools/close-mint",
     category: "management"
   },
   {
