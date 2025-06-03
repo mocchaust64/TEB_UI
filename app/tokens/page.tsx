@@ -220,29 +220,29 @@ export default function TokenPortfolio() {
 
   return (
     <CommonLayout>
-      <div className="container mx-auto px-6 py-12">
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-10"
+          className="text-center mb-6 sm:mb-10"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-2 sm:mb-4">
             Token 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
               {" "}Portfolio
             </span>
           </h1>
-          <p className="text-gray-400 text-xl max-w-3xl mx-auto">
+          <p className="text-gray-400 text-base sm:text-lg md:text-xl max-w-3xl mx-auto">
             Manage and track your tokens
           </p>
         </motion.div>
 
         {!connected ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <Wallet className="w-16 h-16 text-gray-500 mb-6" />
-            <h2 className="text-2xl font-bold text-white mb-3">Connect Your Wallet</h2>
-            <p className="text-gray-400 mb-6 text-center max-w-md">
+          <div className="flex flex-col items-center justify-center py-8 sm:py-10">
+            <Wallet className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mb-4 sm:mb-6" />
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Connect Your Wallet</h2>
+            <p className="text-gray-400 mb-4 sm:mb-6 text-center max-w-md px-4 text-sm sm:text-base">
               Connect your Solana wallet to view and manage your tokens
             </p>
             <WalletButton />
@@ -253,27 +253,27 @@ export default function TokenPortfolio() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8"
         >
           <Card className="bg-gray-900/50 border-gray-700 col-span-1">
-            <CardHeader className="pb-3">
-                  <CardTitle className="text-white text-lg">Total Portfolio Value</CardTitle>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+                  <CardTitle className="text-white text-base sm:text-lg">Total Portfolio Value</CardTitle>
             </CardHeader>
-            <CardContent>
-                  <div className="text-3xl font-bold text-white">
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white">
                     {isLoading && !isRefreshing ? (
                       <div className="flex items-center">
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin text-gray-400" />
+                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin text-gray-400" />
                         <span className="text-gray-400">Loading...</span>
                       </div>
                     ) : (
                       totalValue || "$0.00"
                     )}
                   </div>
-                  <div className="flex items-center mt-2 text-sm text-gray-400">
+                  <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm text-gray-400">
                     Based on available price data
                     {lastUpdated && (
-                      <span className="ml-1">
+                      <span className="ml-1 hidden sm:inline">
                         · Updated {lastUpdated.toLocaleTimeString()}
                       </span>
                     )}
@@ -282,43 +282,43 @@ export default function TokenPortfolio() {
           </Card>
           
           <Card className="bg-gray-900/50 border-gray-700 col-span-1">
-            <CardHeader className="pb-3">
-                  <CardTitle className="text-white text-lg">Number of Tokens</CardTitle>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+                  <CardTitle className="text-white text-base sm:text-lg">Number of Tokens</CardTitle>
             </CardHeader>
-            <CardContent>
-                  <div className="text-3xl font-bold text-white">
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white">
                     {isLoading && !isRefreshing ? (
                       <div className="flex items-center">
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin text-gray-400" />
+                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin text-gray-400" />
                         <span className="text-gray-400">Loading...</span>
                       </div>
                     ) : (
                       tokens.length
                     )}
                   </div>
-              <div className="flex items-center mt-2 text-sm text-gray-400">
+              <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm text-gray-400">
                     Tokens in your wallet
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/30 border-gray-700 col-span-2">
-            <CardHeader className="pb-3">
-                  <CardTitle className="text-white text-lg">Getting Started</CardTitle>
+          <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/30 border-gray-700 col-span-1 sm:col-span-2">
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+                  <CardTitle className="text-white text-base sm:text-lg">Getting Started</CardTitle>
             </CardHeader>
-            <CardContent className="flex justify-between items-center">
+            <CardContent className="flex justify-between items-center p-4 sm:p-6 pt-0 sm:pt-0">
               <div>
-                    <p className="text-gray-300 mb-3">Create new tokens or manage existing ones</p>
-                <div className="flex space-x-3">
-                  <Link href="/create">
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                      <Plus className="w-4 h-4 mr-1" />
+                    <p className="text-gray-300 text-xs sm:text-sm mb-2 sm:mb-3">Create new tokens or manage existing ones</p>
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                  <Link href="/create" className="w-full sm:w-auto">
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm w-full sm:w-auto">
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                           Create Token
                     </Button>
                   </Link>
-                  <Link href="/tokens/manage">
-                    <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
-                      <Wallet className="w-4 h-4 mr-1" />
+                  <Link href="/tokens/manage" className="w-full sm:w-auto">
+                    <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800 text-xs sm:text-sm w-full sm:w-auto">
+                      <Wallet className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                           Manage Tokens
                     </Button>
                   </Link>
@@ -326,7 +326,7 @@ export default function TokenPortfolio() {
               </div>
               
               <div className="hidden md:block">
-                <Coins className="w-16 h-16 text-purple-400 opacity-80" />
+                <Coins className="w-12 h-12 sm:w-16 sm:h-16 text-purple-400 opacity-80" />
               </div>
             </CardContent>
           </Card>
@@ -337,12 +337,12 @@ export default function TokenPortfolio() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 {/* Left column - Token list */}
                 <div className="lg:col-span-2">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
                     <div className="flex items-center">
-                      <h2 className="text-2xl font-bold text-white">Token List</h2>
+                      <h2 className="text-xl sm:text-2xl font-bold text-white">Token List</h2>
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -350,15 +350,15 @@ export default function TokenPortfolio() {
                         disabled={isRefreshing || isLoading}
                         className="ml-2"
                       >
-                        <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
                       </Button>
                     </div>
             
             <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <Input 
                         placeholder="Search tokens..." 
-                className="pl-10 bg-gray-800/50 border-gray-700 text-white"
+                className="pl-9 sm:pl-10 bg-gray-800/50 border-gray-700 text-white text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -366,13 +366,13 @@ export default function TokenPortfolio() {
           </div>
 
           <Tabs defaultValue="my-tokens" className="w-full">
-            <TabsList className="bg-gray-800/50 border-b border-gray-700 w-full justify-start mb-6">
-              <TabsTrigger value="my-tokens" className="data-[state=active]:bg-gray-700">
-                <Wallet className="w-4 h-4 mr-2" />
+            <TabsList className="bg-gray-800/50 border-b border-gray-700 w-full justify-start mb-4 sm:mb-6 overflow-x-auto">
+              <TabsTrigger value="my-tokens" className="data-[state=active]:bg-gray-700 text-xs sm:text-sm">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                         My Tokens
               </TabsTrigger>
-              <TabsTrigger value="watchlist" className="data-[state=active]:bg-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+              <TabsTrigger value="watchlist" className="data-[state=active]:bg-gray-700 text-xs sm:text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 sm:mr-2">
                   <path d="M12 21a9 9 0 0 0 9-9 9 9 0 0 0-9-9 9 9 0 0 0-9 9 9 9 0 0 0 9 9Z"/>
                   <path d="M15 12h-6"/>
                 </svg>

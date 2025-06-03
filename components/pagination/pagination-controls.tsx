@@ -45,19 +45,19 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between mt-6 text-sm">
-      <div className="text-gray-400">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 sm:mt-6 text-xs sm:text-sm">
+      <div className="text-gray-400 order-2 sm:order-1 text-center sm:text-left">
         Showing {startIndex}-{endIndex} of {totalItems} {itemName}
       </div>
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-1 order-1 sm:order-2">
         <Button 
           variant="outline" 
           size="icon" 
-          className="w-8 h-8 p-0 border-gray-700"
+          className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-gray-700"
           onClick={goToPreviousPage} 
           disabled={currentPage === 1}
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
         </Button>
         
         {pageNumbers.map(pageNumber => (
@@ -65,7 +65,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
             key={pageNumber}
             variant={pageNumber === currentPage ? "default" : "outline"} 
             size="icon" 
-            className={`w-8 h-8 p-0 ${pageNumber === currentPage ? 'bg-purple-600 border-purple-600' : 'border-gray-700'}`}
+            className={`w-7 h-7 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm ${pageNumber === currentPage ? 'bg-purple-600 border-purple-600' : 'border-gray-700'}`}
             onClick={() => onPageChange(pageNumber)}
           >
             {pageNumber}
@@ -75,11 +75,11 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
         <Button 
           variant="outline" 
           size="icon" 
-          className="w-8 h-8 p-0 border-gray-700"
+          className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-gray-700"
           onClick={goToNextPage} 
           disabled={currentPage === totalPages}
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
         </Button>
       </div>
     </div>

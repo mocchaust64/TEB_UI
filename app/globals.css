@@ -45,3 +45,14 @@
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
+
+/* scrollbar-hide class để ẩn thanh cuộn */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}

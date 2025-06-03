@@ -276,16 +276,16 @@ const ExtensionOptionInput = ({
   if (option.type === 'text') {
     const textOption = option as TextOptionType;
     return (
-      <div className="space-y-1">
+      <div className="space-y-1 max-w-full overflow-hidden">
       <Input
           placeholder={textOption.placeholder}
-          className={`bg-gray-800 border-gray-700 text-white h-9 ${error ? 'border-red-500' : ''}`}
+          className={`bg-gray-800 border-gray-700 text-white h-9 ${error ? 'border-red-500' : ''} text-xs sm:text-sm`}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
       />
         {error && <p className="text-xs text-red-500">{error}</p>}
         {textOption.required && !error && (
-          <p className="text-xs text-gray-500">* Bắt buộc</p>
+          <p className="text-[10px] sm:text-xs text-gray-500">* Bắt buộc</p>
         )}
       </div>
     );
@@ -293,8 +293,8 @@ const ExtensionOptionInput = ({
   
   if (option.type === 'slider') {
     return (
-      <div className="pt-1">
-        <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+      <div className="pt-1 w-full max-w-full">
+        <div className="flex justify-between text-[10px] sm:text-xs text-gray-400 mb-1.5">
           <span>{(option as SliderOptionType).min}%</span>
           <span>Current: {value || (option as SliderOptionType).defaultValue}%</span>
           <span>{(option as SliderOptionType).max}%</span>
@@ -305,6 +305,7 @@ const ExtensionOptionInput = ({
           step={(option as SliderOptionType).step}
           defaultValue={[Number(value || (option as SliderOptionType).defaultValue)]}
           onValueChange={(value) => onChange(value[0])}
+          className="w-full"
         />
       </div>
     );
@@ -313,9 +314,9 @@ const ExtensionOptionInput = ({
   if (option.type === 'select') {
     const selectOption = option as SelectOptionType;
     return (
-      <div className="space-y-1">
+      <div className="space-y-1 max-w-full overflow-hidden">
         <select
-          className={`w-full bg-gray-800 border border-gray-700 text-white rounded-md h-9 px-3 ${error ? 'border-red-500' : ''}`}
+          className={`w-full bg-gray-800 border border-gray-700 text-white rounded-md h-9 px-3 text-xs sm:text-sm ${error ? 'border-red-500' : ''}`}
           value={value?.toString() || selectOption.defaultValue}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -755,26 +756,26 @@ export default function CreateToken() {
 
   return (
     <CommonLayout>
-      <div className="container mx-auto px-6 py-12">
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-12"
+          className="text-center mb-8 sm:mb-12"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3 sm:mb-4">
             Create New 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
               {" "}Token
             </span>
           </h1>
-          <p className="text-gray-400 text-xl max-w-3xl mx-auto">
+          <p className="text-gray-400 text-base sm:text-lg md:text-xl max-w-3xl mx-auto">
             Design your custom token with Solana's powerful token extensions
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 space-y-8">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-8">
+          <div className="md:col-span-2 space-y-4 sm:space-y-8">
             {/* Token Basic Details */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -782,19 +783,19 @@ export default function CreateToken() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Coins className="w-5 h-5 mr-2" />
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-white flex items-center text-lg sm:text-xl">
+                    <Coins className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     Token Basic Details
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-gray-400 text-sm sm:text-base">
                     Enter the basic information for your token
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <CardContent className="space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="token-name" className="text-white">Token Name<span className="text-red-500 ml-1">*</span></Label>
+                      <Label htmlFor="token-name" className="text-white text-sm sm:text-base">Token Name<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-name" 
                         placeholder="e.g. My Amazing Token" 
@@ -810,7 +811,7 @@ export default function CreateToken() {
                       {formErrors.name && <p className="text-xs text-red-500">{formErrors.name}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-symbol" className="text-white">Token Symbol<span className="text-red-500 ml-1">*</span></Label>
+                      <Label htmlFor="token-symbol" className="text-white text-sm sm:text-base">Token Symbol<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-symbol" 
                         placeholder="e.g. MAT" 
@@ -826,7 +827,7 @@ export default function CreateToken() {
                       {formErrors.symbol && <p className="text-xs text-red-500">{formErrors.symbol}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-decimals" className="text-white">Decimals<span className="text-red-500 ml-1">*</span></Label>
+                      <Label htmlFor="token-decimals" className="text-white text-sm sm:text-base">Decimals<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-decimals" 
                         type="number" 
@@ -842,7 +843,7 @@ export default function CreateToken() {
                       {formErrors.decimals && <p className="text-xs text-red-500">{formErrors.decimals}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="token-supply" className="text-white">Initial Supply<span className="text-red-500 ml-1">*</span></Label>
+                      <Label htmlFor="token-supply" className="text-white text-sm sm:text-base">Initial Supply<span className="text-red-500 ml-1">*</span></Label>
                       <Input 
                         id="token-supply" 
                         type="number" 
@@ -859,9 +860,9 @@ export default function CreateToken() {
                     </div>
                   </div>
                   
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="token-description" className="text-white">Description</Label>
+                  <div className="grid sm:grid-cols-3 gap-4 mt-2 sm:mt-4">
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label htmlFor="token-description" className="text-white text-sm sm:text-base">Description</Label>
                       <Textarea 
                         id="token-description" 
                         placeholder="Describe your token and its purpose" 
@@ -872,10 +873,10 @@ export default function CreateToken() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="token-image" className="text-white">Token Image<span className="text-red-500 ml-1">*</span></Label>
+                      <Label htmlFor="token-image" className="text-white text-sm sm:text-base text-center block">Token Image<span className="text-red-500 ml-1">*</span></Label>
                       {tokenData.image ? (
                         <div className="relative flex items-center justify-center">
-                          <div className={`w-24 h-24 rounded-full overflow-hidden border-2 ${formErrors.image ? 'border-red-500' : 'border-purple-500/30'} flex items-center justify-center bg-gray-800`}>
+                          <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 ${formErrors.image ? 'border-red-500' : 'border-purple-500/30'} flex items-center justify-center bg-gray-800`}>
                             <img 
                               src={tokenData.imageUrl || URL.createObjectURL(tokenData.image)} 
                               alt="Token Preview" 
@@ -885,13 +886,13 @@ export default function CreateToken() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="absolute top-0 right-0 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-1 h-8 w-8"
+                            className="absolute top-0 right-0 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-1 h-7 w-7 sm:h-8 sm:w-8"
                             onClick={() => {
                               setTokenData({...tokenData, image: null, imageUrl: ""});
                               setFormErrors({...formErrors, image: "Bạn phải tải lên ảnh cho token"});
                             }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
                               <path d="M18 6 6 18"/>
                               <path d="m6 6 12 12"/>
                             </svg>
@@ -899,13 +900,13 @@ export default function CreateToken() {
                         </div>
                       ) : (
                         <div 
-                          className={`flex items-center justify-center border-2 border-dashed ${formErrors.image ? 'border-red-500' : 'border-gray-700'} rounded-full h-24 w-24 mx-auto cursor-pointer hover:border-purple-500/50 transition-colors`}
+                          className={`flex items-center justify-center border-2 border-dashed ${formErrors.image ? 'border-red-500' : 'border-gray-700'} rounded-full h-20 w-20 sm:h-24 sm:w-24 mx-auto cursor-pointer hover:border-purple-500/50 transition-colors`}
                           onClick={() => document.getElementById('token-image')?.click()}
                         >
                           <div className="text-center">
-                            <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                            <Upload className="mx-auto h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
                             <p className="mt-1 text-xs text-gray-400">
-                              {uploadingImage ? "Uploading..." : "Upload Image"}
+                              {uploadingImage ? "Uploading..." : "Upload"}
                             </p>
                           </div>
                           <input 
@@ -933,52 +934,52 @@ export default function CreateToken() {
                   </div>
                   
                   <div className="pt-2">
-                    <h3 className="text-white font-medium mb-3">Social Links (Optional)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <h3 className="text-white font-medium mb-2 sm:mb-3 text-sm sm:text-base">Social Links (Optional)</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <div className="flex items-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.5 8.5-3-2.5a1 1 0 0 0-1.5 1V12a1 1 0 0 0 1.5 1l3-2.5a1 1 0 0 0 0-2Z"/>
                         </svg>
                         <Input 
                           placeholder="Website URL" 
-                          className="bg-gray-800 border-gray-700 text-white"
+                          className="bg-gray-800 border-gray-700 text-white text-sm"
                           value={tokenData.websiteUrl}
                           onChange={(e) => setTokenData({...tokenData, websiteUrl: e.target.value})}
                         />
                       </div>
                       <div className="flex items-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/>
                         </svg>
                         <Input 
                           placeholder="Twitter URL" 
-                          className="bg-gray-800 border-gray-700 text-white"
+                          className="bg-gray-800 border-gray-700 text-white text-sm"
                           value={tokenData.twitterUrl}
                           onChange={(e) => setTokenData({...tokenData, twitterUrl: e.target.value})}
                         />
                       </div>
                       <div className="flex items-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="m22 8-5 5-5-5 5-5-5 5-5-5 5 5-5 5 5-5"/>
                           <path d="M2 12h10"/>
                           <path d="M17 22v-8.3a4 4 0 0 0-4-4h-1.7"/>
                         </svg>
                         <Input 
                           placeholder="Telegram URL" 
-                          className="bg-gray-800 border-gray-700 text-white"
+                          className="bg-gray-800 border-gray-700 text-white text-sm"
                           value={tokenData.telegramUrl}
                           onChange={(e) => setTokenData({...tokenData, telegramUrl: e.target.value})}
                         />
                       </div>
                       <div className="flex items-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="text-indigo-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M18 20a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3"/>
                           <path d="M12 15a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
                           <path d="M18 9a5 5 0 0 0-6-5 5 5 0 0 0-6 5v1a2 2 0 1 0 0 4"/>
                         </svg>
                         <Input 
                           placeholder="Discord URL" 
-                          className="bg-gray-800 border-gray-700 text-white"
+                          className="bg-gray-800 border-gray-700 text-white text-sm"
                           value={tokenData.discordUrl}
                           onChange={(e) => setTokenData({...tokenData, discordUrl: e.target.value})}
                         />
@@ -996,22 +997,22 @@ export default function CreateToken() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white">Selected Extensions Configuration</CardTitle>
-                  <CardDescription className="text-gray-400">
+                <CardHeader className="pb-2 p-4 sm:p-6">
+                  <CardTitle className="text-white text-lg sm:text-xl">Selected Extensions Configuration</CardTitle>
+                  <CardDescription className="text-gray-400 text-sm sm:text-base">
                     Configure the options for your selected token extensions
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
                   {selectedExtensions.length === 0 ? (
                     <div className="text-center py-4 text-gray-400">
-                      <FileText className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                      <p>No extensions selected yet</p>
-                      <p className="text-sm text-gray-500 mt-1">Choose from the extensions list on the right</p>
+                      <FileText className="mx-auto h-6 w-6 sm:h-8 sm:w-8 mb-2 opacity-50" />
+                      <p className="text-sm sm:text-base">No extensions selected yet</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">Choose from the extensions list on the right</p>
                     </div>
                   ) : (
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                      <TabsList className="bg-gray-800 w-full flex overflow-x-auto">
+                      <TabsList className="bg-gray-800 w-full flex overflow-x-auto pb-0.5 scrollbar-hide">
                         {selectedExtensions.map(extId => {
                           const extension = tokenExtensions.find(ext => ext.id === extId);
                           if (!extension) return null;
@@ -1020,10 +1021,10 @@ export default function CreateToken() {
                             <TabsTrigger 
                               key={extId} 
                               value={extId}
-                              className="data-[state=active]:bg-gray-700 data-[state=active]:text-white h-9"
+                              className="data-[state=active]:bg-gray-700 data-[state=active]:text-white h-8 sm:h-9 text-xs sm:text-sm flex-shrink-0"
                             >
-                              <IconComponent className={`w-4 h-4 mr-1 ${extension.color}`} />
-                              <span className="truncate max-w-[80px]">{extension.name}</span>
+                              <IconComponent className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 ${extension.color}`} />
+                              <span className="truncate max-w-[60px] sm:max-w-[80px]">{extension.name}</span>
                             </TabsTrigger>
                           );
                         })}
@@ -1033,46 +1034,48 @@ export default function CreateToken() {
                         if (!extension) return null;
                         const IconComponent = extension.icon;
                         return (
-                          <TabsContent key={extId} value={extId} className="py-3">
+                          <TabsContent key={extId} value={extId} className="py-3 overflow-hidden">
                             <div className="space-y-3">
-                              <div className="flex items-start space-x-3">
-                                <div className={`p-2 rounded-lg ${extension.bgColor} shrink-0`}>
-                                  <IconComponent className={`w-4 h-4 ${extension.color}`} />
+                              <div className="flex items-start space-x-2 sm:space-x-3">
+                                <div className={`p-1.5 sm:p-2 rounded-lg ${extension.bgColor} shrink-0`}>
+                                  <IconComponent className={`w-3 h-3 sm:w-4 sm:h-4 ${extension.color}`} />
                                 </div>
-                                <div>
-                                  <h3 className="text-base font-semibold text-white">{extension.name}</h3>
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-sm sm:text-base font-semibold text-white">{extension.name}</h3>
                                   <p className="text-xs text-gray-400">{extension.description}</p>
                                 </div>
                               </div>
                               
                               {extension.options.length === 0 ? (
-                                <div className="bg-gray-800/50 rounded-lg p-3 text-gray-400 text-xs">
+                                <div className="bg-gray-800/50 rounded-lg p-2 sm:p-3 text-gray-400 text-xs">
                                   <div className="flex items-center">
                                     <Info className="w-3 h-3 mr-1" />
                                     <span>This extension doesn't require any additional configuration.</span>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="space-y-3 mt-3">
+                                <div className="space-y-3 mt-3 px-1">
                                   {extension.options.map(option => (
                                     <div key={option.id} className="space-y-1">
-                                      <Label htmlFor={`${extId}-${option.id}`} className="text-white text-sm">
+                                      <Label htmlFor={`${extId}-${option.id}`} className="text-white text-xs sm:text-sm">
                                         {option.label}
                                         {option.type === 'text' && (option as TextOptionType).required && (
                                           <span className="text-red-500 ml-1">*</span>
                                         )}
                                       </Label>
-                                      <ExtensionOptionInput
-                                        option={option}
-                                        value={tokenData.extensionOptions[extId]?.[option.id]}
-                                        onChange={(value) => updateExtensionOption(extId, option.id, value)}
-                                        error={validationErrors[extId]?.[option.id]}
-                                      />
+                                      <div className="max-w-full overflow-x-hidden">
+                                        <ExtensionOptionInput
+                                          option={option}
+                                          value={tokenData.extensionOptions[extId]?.[option.id]}
+                                          onChange={(value) => updateExtensionOption(extId, option.id, value)}
+                                          error={validationErrors[extId]?.[option.id]}
+                                        />
+                                      </div>
                                     </div>
                                   ))}
                                   
                                   {extension.id === "transfer-fees" && (
-                                    <div className="bg-gray-800/50 rounded-lg p-3 text-gray-400 text-xs mt-3">
+                                    <div className="bg-gray-800/50 rounded-lg p-2 sm:p-3 text-gray-400 text-xs mt-3">
                                       <div className="flex items-start">
                                         <Info className="w-3 h-3 mr-1 mt-0.5 shrink-0" />
                                         <span>
@@ -1104,16 +1107,16 @@ export default function CreateToken() {
             className="md:col-span-1"
           >
             <Card className="bg-gray-900/50 border-gray-700 sticky top-4">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center">
-                  <FileText className="w-5 h-5 mr-2" />
+              <CardHeader className="pb-2 p-4 sm:p-6">
+                <CardTitle className="text-white flex items-center text-base sm:text-lg">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
                   Token Extensions
                 </CardTitle>
-                <CardDescription className="text-gray-400">
+                <CardDescription className="text-gray-400 text-xs sm:text-sm">
                   Select the extensions you want to add to your token
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+              <CardContent className="space-y-2 sm:space-y-3 max-h-[350px] sm:max-h-[50vh] overflow-y-auto p-2 sm:p-3 sm:pr-2">
                 {tokenExtensions.map((extension) => {
                   const IconComponent = extension.icon;
                   const isSelected = selectedExtensions.includes(extension.id);
@@ -1132,7 +1135,7 @@ export default function CreateToken() {
                   return (
                     <div 
                       key={extension.id}
-                      className={`flex items-center p-3 rounded-lg border transition-colors ${
+                      className={`flex items-center p-2 sm:p-3 rounded-lg border transition-colors ${
                         extension.disabled ? 'bg-gray-800/30 border-gray-700 opacity-60 cursor-not-allowed' :
                         isSelected 
                           ? 'bg-purple-500/20 border-purple-500 cursor-pointer' 
@@ -1142,33 +1145,33 @@ export default function CreateToken() {
                       }`}
                       onClick={() => !extension.disabled && toggleExtension(extension.id)}
                     >
-                      <div className={`p-2 rounded-lg ${extension.bgColor} mr-3 shrink-0`}>
-                        <IconComponent className={`w-5 h-5 ${extension.color}`} />
+                      <div className={`p-1.5 sm:p-2 rounded-lg ${extension.bgColor} mr-2 sm:mr-3 shrink-0`}>
+                        <IconComponent className={`w-4 h-4 sm:w-5 sm:h-5 ${extension.color}`} />
                       </div>
-                      <div className="flex-grow min-w-0 mr-3">
-                        <div className="flex items-center">
-                        <p className="text-white font-medium">{extension.name}</p>
+                      <div className="min-w-0 flex-1 mr-2">
+                        <div className="flex items-center flex-wrap gap-1">
+                        <p className="text-white font-medium text-xs sm:text-sm">{extension.name}</p>
                           {extension.disabled && (
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-700 text-gray-300 rounded">
+                            <span className="ml-1 px-1 py-0.5 text-[10px] bg-gray-700 text-gray-300 rounded whitespace-nowrap">
                               Beta
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400 line-clamp-2">{extension.description}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-2">{extension.description}</p>
                         {compatibilityStatus && (
-                          <p className="text-xs text-red-400 mt-1">{compatibilityStatus}</p>
+                          <p className="text-[10px] sm:text-xs text-red-400 mt-0.5 sm:mt-1 truncate">{compatibilityStatus}</p>
                         )}
                         {extension.disabled && extension.disabledReason && (
-                          <p className="text-xs text-yellow-500 mt-1">{extension.disabledReason}</p>
+                          <p className="text-[10px] sm:text-xs text-yellow-500 mt-0.5 sm:mt-1 truncate">{extension.disabledReason}</p>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center">
-                        <div className={`h-5 w-5 rounded-full ${
+                        <div className={`h-4 w-4 sm:h-5 sm:w-5 rounded-full ${
                           extension.disabled ? 'bg-gray-700' :
                           isSelected ? 'bg-purple-600' : 'bg-gray-700'
                         } flex items-center justify-center`}>
                           {isSelected && (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white">
                               <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                           )}
@@ -1180,20 +1183,20 @@ export default function CreateToken() {
               </CardContent>
             </Card>
 
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-5 text-base"
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 sm:py-5 text-sm sm:text-base"
                       onClick={handleCreateToken}
                     >
-                      <Coins className="mr-1.5 h-4 w-4" />
+                      <Coins className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
                       Create Token
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Create your token with the selected extensions</p>
+                    <p className="text-xs sm:text-sm">Create your token with the selected extensions</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

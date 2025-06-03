@@ -223,34 +223,34 @@ export default function BurnToken() {
 
   return (
     <CommonLayout>
-      <div className="container mx-auto px-6 py-12">
-        <div className="flex items-center gap-2 mb-8">
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="flex items-center gap-2 mb-6 sm:mb-8">
           <Button 
             variant="ghost" 
             className="text-gray-400 hover:text-white p-0 flex items-center gap-1"
             onClick={() => router.push("/tools")}
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Back
           </Button>
         </div>
-      
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col items-center mb-10"
+          className="flex flex-col items-center mb-6 sm:mb-10"
         >
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center mb-4">
-            <Flame className="w-8 h-8 text-red-400" />
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center mb-4">
+            <Flame className="w-7 h-7 sm:w-8 sm:h-8 text-red-400" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 text-center">
             Burn Token
           </h1>
-          <p className="text-gray-400 text-lg max-w-xl text-center">
-            Reduce the circulating supply by burning tokens from your wallet
+          <p className="text-gray-400 text-sm sm:text-lg max-w-xl text-center">
+            Destroy tokens to reduce the circulating supply permanently
           </p>
         </motion.div>
-        
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,19 +259,76 @@ export default function BurnToken() {
         >
           {!connected ? (
             <Card className="bg-gray-900/50 border-gray-700">
-              <CardContent className="p-8 flex flex-col items-center justify-center text-center">
-                <Flame className="w-12 h-12 text-gray-500 mb-4" />
-                <h3 className="text-white text-xl font-medium mb-2">Connect your wallet</h3>
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center text-center">
+                <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-amber-400 mb-4" />
+                <h3 className="text-white text-lg sm:text-xl font-medium mb-2">Wallet Connection Required</h3>
                 <p className="text-gray-400 mb-6">
-                  You need to connect a Solana wallet to burn tokens
+                  Please connect your wallet to burn tokens.
                 </p>
                 <WalletButton />
+              </CardContent>
+            </Card>
+          ) : isLoading ? (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center">
+                <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-purple-500 animate-spin mb-4" />
+                <h3 className="text-white text-lg sm:text-xl mb-2">Loading Your Tokens</h3>
+                <p className="text-gray-400">Please wait while we fetch your token information...</p>
+              </CardContent>
+            </Card>
+          ) : isError ? (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center">
+                <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-4" />
+                <h3 className="text-white text-lg sm:text-xl mb-2">Error Loading Tokens</h3>
+                <p className="text-gray-400 mb-4">
+                  There was a problem loading your tokens. Please try again.
+                </p>
+                <Button onClick={handleRefreshTokens} disabled={isRefreshing}>
+                  {isRefreshing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Refreshing
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : tokens.length === 0 ? (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center text-center">
+                <Info className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400 mb-4" />
+                <h3 className="text-white text-lg sm:text-xl mb-2">No Tokens Found</h3>
+                <p className="text-gray-400 mb-4">
+                  You don&apos;t have any token with non-zero balance in your wallet.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Button onClick={handleRefreshTokens} variant="outline" disabled={isRefreshing}>
+                    {isRefreshing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Refreshing
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+                      </>
+                    )}
+                  </Button>
+                  <Link href="/tools">
+                    <Button variant="default">
+                      Explore Other Tools
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ) : transactionSignature ? (
             <Card className="bg-gray-900/50 border-gray-700 mb-6">
               <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
                     width="32" 
@@ -288,7 +345,7 @@ export default function BurnToken() {
                     <polyline points="22 4 12 14.01 9 11.01"/>
                   </svg>
                 </div>
-                <h3 className="text-white text-xl font-medium mb-2">Token burned successfully!</h3>
+                <h3 className="text-white text-xl font-medium mb-2">Tokens Burned Successfully!</h3>
                 <p className="text-gray-400 mb-4">
                   Transaction has been confirmed on the blockchain
                 </p>
@@ -303,7 +360,7 @@ export default function BurnToken() {
                     rel="noopener noreferrer"
                   >
                     <Button variant="outline" className="flex items-center gap-1">
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       View on Explorer
                     </Button>
                   </Link>
@@ -320,14 +377,14 @@ export default function BurnToken() {
               </CardContent>
             </Card>
           ) : (
-          <Card className="bg-gray-900/50 border-gray-700">
-            <CardHeader>
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-white text-xl">Burn Details</CardTitle>
-              <CardDescription className="text-gray-400">
-                      Enter details to burn your tokens
-              </CardDescription>
+                    <CardTitle className="text-white text-lg sm:text-xl">Burn Details</CardTitle>
+                    <CardDescription className="text-gray-400 text-xs sm:text-sm">
+                      Select a token and amount to burn permanently
+                    </CardDescription>
                   </div>
                   <Button 
                     variant="ghost" 
@@ -336,252 +393,179 @@ export default function BurnToken() {
                     onClick={handleRefreshTokens}
                     disabled={isLoading || isRefreshing}
                   >
-                    <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`h-4 h-4 sm:h-5 sm:w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="bg-red-900/20 border-red-700 text-red-100">
-                <AlertCircle className="h-4 w-4 text-red-400" />
-                  <AlertTitle>Important Note</AlertTitle>
-                <AlertDescription className="text-red-200">
-                    Burning tokens is irreversible. Burned tokens will be permanently removed from circulation.
-                </AlertDescription>
-              </Alert>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="bg-amber-900/20 border-amber-900/50 text-amber-200">
+                  <AlertCircle className="w-4 h-4" />
+                  <AlertTitle className="text-xs sm:text-sm font-medium">Warning: Irreversible Action</AlertTitle>
+                  <AlertDescription className="text-[10px] sm:text-xs text-amber-200">
+                    Burning tokens permanently removes them from circulation. This action cannot be undone.
+                  </AlertDescription>
+                </Alert>
 
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <Loader2 className="w-10 h-10 text-red-500 animate-spin mb-4" />
-                    <p className="text-gray-400">Loading token list...</p>
+                <div className="relative">
+                  <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                    <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                   </div>
-                ) : isError ? (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
-                    <p className="text-white text-lg font-medium mb-2">Unable to load tokens</p>
-                    <p className="text-gray-400 mb-4">An error occurred while loading token list</p>
-                    <Button 
-                      variant="outline" 
-                      className="border-gray-600 text-white"
-                      onClick={() => loadTokens(true)}
-                    >
-                      Try Again
-                    </Button>
-                  </div>
-                ) : tokens.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <Flame className="w-10 h-10 text-gray-500 mb-4" />
-                    <p className="text-white text-lg font-medium mb-2">No tokens found</p>
-                    <p className="text-gray-400 mb-4">You don't have any tokens to burn</p>
-                    <Button 
-                      variant="outline" 
-                      className="border-gray-600 text-white"
-                      onClick={() => router.push("/create")}
-                    >
-                      Create New Token
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-              <div className="space-y-2">
-                      <Label htmlFor="token" className="text-white">Select Token</Label>
-                <Select value={selectedToken} onValueChange={setSelectedToken}>
-                  <SelectTrigger className="w-full bg-gray-800/70 border-gray-700 text-white">
-                          <SelectValue placeholder="Choose a token to burn" />
-                  </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700 max-h-80">
-                          <div className="flex items-center px-2 pb-1 sticky top-0 bg-gray-800 z-10">
-                            <Search className="w-4 h-4 text-gray-400 absolute left-4" />
-                            <Input 
-                              placeholder="Search tokens..." 
-                              className="pl-8 bg-gray-700/50 border-gray-600 text-white text-sm"
-                              value={tokenSearchTerm}
-                              onChange={handleTokenSearch}
-                            />
-                          </div>
-                          
-                          {filteredTokens.length > 0 ? (
-                            filteredTokens.map((token) => (
-                      <SelectItem 
-                        key={token.id} 
-                        value={token.id}
-                      >
-                        <div className="flex items-center">
-                                  <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center mr-2">
-                                    {token.image ? (
-                                      <img 
-                                        src={token.image} 
-                                        alt={token.name} 
-                                        className="w-full h-full object-cover" 
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">{token.symbol.charAt(0)}</span>
-                                      </div>
-                                    )}
-                          </div>
-                          <span>{token.name} ({token.symbol})</span>
-                                  <span className="ml-2 text-gray-400 text-xs">
-                                    Balance: {formatTokenBalance(token.balance, token.decimals)}
-                                  </span>
-                        </div>
-                      </SelectItem>
-                            ))
-                          ) : (
-                            <div className="p-2 text-center text-gray-400 text-sm">
-                              No tokens found
-                            </div>
-                          )}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {currentToken && (
-                      <div className="bg-gray-800/40 rounded-md p-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-sm text-gray-400">Current Balance</p>
-                          <p className="text-white font-medium">{formatTokenBalance(currentToken.balance, currentToken.decimals)} {currentToken.symbol}</p>
-                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search tokens by name or symbol..."
+                    className="ps-10 bg-gray-800 border-gray-700"
+                    value={tokenSearchTerm}
+                    onChange={handleTokenSearch}
+                  />
                 </div>
-              )}
-              
-              <div className="space-y-2">
-                      <Label htmlFor="amount" className="text-white">Amount</Label>
-                      <div className="flex gap-2">
-                <Input
-                  id="amount"
-                  type="text"
-                          placeholder="Enter amount to burn"
-                          className="bg-gray-800/70 border-gray-700 text-white flex-1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                        {currentToken && (
-                          <Button 
-                            variant="outline"
-                            size="sm" 
-                            className="text-sm"
-                            onClick={() => setAmount(currentToken.balance)}
-                          >
-                            MAX
-                          </Button>
-                        )}
+
+                <div className="space-y-2 sm:space-y-3">
+                  <Label htmlFor="token" className="text-white text-sm sm:text-base">Select Token</Label>
+                  <Select value={selectedToken} onValueChange={setSelectedToken}>
+                    <SelectTrigger id="token" className="bg-gray-800 border-gray-700 text-xs sm:text-sm">
+                      <SelectValue placeholder="Select a token to burn" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-xs sm:text-sm max-h-[300px]">
+                      {filteredTokens.map((token) => (
+                        <SelectItem key={token.id} value={token.id}>
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 mr-2 rounded-full overflow-hidden flex-shrink-0">
+                              {token.image ? (
+                                <img 
+                                  src={token.image}
+                                  alt={token.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center">
+                                  <span className="text-white text-[8px]">{token.symbol.charAt(0)}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span>
+                              {token.name} ({token.symbol}) - Balance: {formatTokenBalance(token.balance, token.decimals)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {currentToken && (
+                  <div className="bg-gray-800/40 rounded-md p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm text-gray-400">Current Balance</p>
+                      <p className="text-white font-medium">{formatTokenBalance(currentToken.balance, currentToken.decimals)} {currentToken.symbol}</p>
+                    </div>
+                    <Separator className="bg-gray-700 my-2" />
+                    <div className="space-y-2">
+                      <Label htmlFor="amount" className="text-sm sm:text-base">Burn Amount</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="amount"
+                          type="number"
+                          placeholder="Amount to burn"
+                          className="bg-gray-800 border-gray-700 text-xs sm:text-sm"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          className="text-xs sm:text-sm"
+                          onClick={() => setAmount(currentToken.balance)}
+                        >
+                          MAX
+                        </Button>
                       </div>
-              </div>
-              
-              <Separator className="bg-gray-700" />
-              
-              {currentToken && amount && (
-                      <div className="rounded-md p-3">
-                        <p className="text-sm text-gray-400 mb-1">Balance after burning</p>
-                        <p className="text-white font-medium text-lg">
-                          {amount 
-                            ? formatTokenBalance(Math.max(0, parseFloat(currentToken.balance) - parseFloat(amount)), currentToken.decimals)
-                            : formatTokenBalance(currentToken.balance, currentToken.decimals)
-                          } {currentToken.symbol}
+                    </div>
+                  </div>
+                )}
+
+                {currentToken && amount && (
+                  <div className="rounded-md p-3">
+                    <p className="text-sm text-gray-400 mb-1">Total Balance After Burning</p>
+                    <p className="text-white font-medium text-base sm:text-lg">
+                      {amount 
+                        ? (parseFloat(currentToken.balance) - parseFloat(amount || "0")).toLocaleString()
+                        : parseFloat(currentToken.balance).toLocaleString()
+                      } {currentToken.symbol}
                     </p>
                   </div>
-                    )}
-                  </>
-              )}
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button 
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  disabled={!selectedToken || !amount || isProcessing || !currentToken}
-                  onClick={openConfirmDialog}
-              >
-                {isProcessing ? (
-                  <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
-                  </>
-                ) : (
-                  <>
-                      <Flame className="mr-2 h-4 w-4" /> Burn Token
-                  </>
                 )}
-              </Button>
-              
-              <p className="text-xs text-gray-400 text-center">
+              </CardContent>
+              <CardFooter className="flex flex-col gap-2 sm:gap-4">
+                <Button 
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 sm:py-3"
+                  disabled={!currentToken || !amount || isProcessing}
+                  onClick={openConfirmDialog}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> Processing
+                    </>
+                  ) : (
+                    <>
+                      <Flame className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Burn Token
+                    </>
+                  )}
+                </Button>
+                
+                <p className="text-xs text-gray-400 text-center">
                   The burn transaction will be confirmed through your connected wallet.
-              </p>
-            </CardFooter>
-          </Card>
+                </p>
+              </CardFooter>
+            </Card>
           )}
         </motion.div>
-      </div>
 
-      {/* Dialog to confirm token burn */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-              <Flame className="h-5 w-5 text-red-500" />
-              Confirm Token Burn
-            </DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Burning tokens is irreversible. Please confirm the details below.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {currentToken && (
-            <div className="space-y-4 py-4">
-              <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
-                <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
-                  {currentToken.image ? (
-                    <img 
-                      src={currentToken.image} 
-                      alt={currentToken.name} 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
-                      <span className="text-white font-bold">{currentToken.symbol.charAt(0)}</span>
-                    </div>
-                  )}
+        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <DialogContent className="sm:max-w-[425px] bg-gray-900 text-gray-200 border-gray-700">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl text-white">Confirm Token Burn</DialogTitle>
+              <DialogDescription className="text-gray-400 text-xs sm:text-sm">
+                You are about to permanently burn tokens. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {currentToken && (
+              <div className="space-y-3 py-2 text-xs sm:text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Token:</span>
+                  <span className="font-medium">{currentToken.name} ({currentToken.symbol})</span>
                 </div>
-                <div>
-                  <p className="font-medium text-white">{currentToken.name}</p>
-                  <p className="text-sm text-gray-400">{currentToken.symbol}</p>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Amount to Burn:</span>
+                  <span className="font-medium">{amount} {currentToken.symbol}</span>
+                </div>
+                <Separator className="bg-gray-800" />
+                <div className="flex justify-between text-red-400">
+                  <span>Tokens will be permanently removed</span>
+                  <Flame className="w-4 h-4" />
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-gray-400 mb-1">Burn Amount</p>
-                  <p className="text-white font-medium text-lg">{formatTokenBalance(amount, currentToken.decimals)}</p>
-                </div>
-                <div className="p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-gray-400 mb-1">Balance After Burning</p>
-                  <p className="text-white font-medium text-lg">{formatTokenBalance(Math.max(0, parseFloat(currentToken.balance) - parseFloat(amount)), currentToken.decimals)}</p>
-                </div>
-              </div>
-              
-              <Alert className="bg-red-900/20 border-red-700">
-                <AlertCircle className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-200">
-                  Burned tokens will be permanently removed from circulation and cannot be recovered.
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-          
-          <DialogFooter className="gap-3 sm:gap-0">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowConfirmDialog(false)}
-              className="border-gray-700 text-white"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleBurn}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Confirm Burn
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+            
+            <DialogFooter className="sm:justify-between mt-2 gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 sm:flex-none text-xs sm:text-sm"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleBurn} 
+                className="bg-red-600 hover:bg-red-700 flex-1 sm:flex-none text-xs sm:text-sm"
+              >
+                <Flame className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" /> Confirm Burn
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </CommonLayout>
   )
-} 
+}  

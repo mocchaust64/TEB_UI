@@ -117,7 +117,7 @@ export async function getUserTokens(connection: Connection, wallet: WalletContex
                   image = metadataJson.image || null;
                 }
               } catch (error) {
-                console.error('Error fetching metadata:', error);
+                
               }
             }
           }
