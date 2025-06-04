@@ -32,7 +32,8 @@ import {
   ArrowLeft,
   Medal,
   ExternalLink,
-  Info
+  Info,
+  Webhook
 } from "lucide-react"
 import { useConnection, useWallet} from "@solana/wallet-adapter-react"
 import { PublicKey } from "@solana/web3.js"
@@ -115,6 +116,14 @@ const tokenExtensionsMap: Record<string, TokenExtensionType> = {
     description: "Authority allowed to close this mint",
     color: "text-pink-600",
     bgColor: "bg-pink-600/10",
+  },
+  "transfer-hook": {
+    id: "transfer-hook",
+    icon: Webhook,
+    name: "Transfer Hook",
+    description: "Execute custom program logic on every token transfer",
+    color: "text-indigo-500",
+    bgColor: "bg-indigo-500/10",
   },
   // Metadata is added by default, but kept for display in UI review
   "metadata": {

@@ -296,6 +296,15 @@ export async function createToken(
       // Truyền cả state và freezeAuthority vào addDefaultAccountState
       tokenBuilder.addDefaultAccountState(defaultState, freezeAuthority);
     }
+    else if (extensionId === "transfer-hook" && tokenData.extensionOptions?.["transfer-hook"]) {
+      // Lấy địa chỉ chương trình transfer hook từ input hoặc sử dụng địa chỉ mặc định
+      const hookProgramId = tokenData.extensionOptions["transfer-hook"]["program-id"]
+        ? new PublicKey(tokenData.extensionOptions["transfer-hook"]["program-id"])
+        : wallet.publicKey;
+      
+      // Thêm extension TransferHook
+      tokenBuilder.addTransferHook(hookProgramId);
+    }
     // Có thể thêm các extension khác ở đây
   }
   

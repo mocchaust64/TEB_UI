@@ -20,7 +20,8 @@ import {
   Shield, 
   FileText, 
   Upload,
-  Info
+  Info,
+  Webhook
 } from "lucide-react"
 import { 
   Tooltip,
@@ -254,6 +255,24 @@ const tokenExtensions: TokenExtensionType[] = [
         label: "Close Authority Address", 
         type: "text", 
         placeholder: "Enter close authority public key",
+        required: true,
+        validator: validatePublicKey
+      }
+    ]
+  },
+  {
+    id: "transfer-hook",
+    icon: Webhook,
+    name: "Transfer Hook",
+    description: "Execute custom program logic on every token transfer",
+    color: "text-indigo-500",
+    bgColor: "bg-indigo-500/10",
+    options: [
+      { 
+        id: "program-id", 
+        label: "Transfer Hook Program ID", 
+        type: "text", 
+        placeholder: "Enter program ID of the transfer hook",
         required: true,
         validator: validatePublicKey
       }
