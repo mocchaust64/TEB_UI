@@ -1,0 +1,2 @@
+# This directory is kept for examples, but the problematic SDKs have been removed
+# Phantom's security requirements don't allow direct use of Keypair and sendAndConfirmTransaction 
