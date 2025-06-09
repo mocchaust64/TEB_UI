@@ -320,10 +320,7 @@ export async function createToken(
   const useToken2022 = realExtensions.length > 0;
   const tokenProgramId = useToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
   
-  // BƯỚC 8.3: Tạo mintTo instructions
-  // Khởi tạo đối tượng TransferFeeToken để tạo instructions cho mint
-  
-  // Tính toán feeBasisPoints và maxFeeValue
+  // BƯỚC 8.3: Tính toán feeBasisPoints và maxFeeValue cho token mint 
   let feeBasisPoints = 0;
   let maxFeeValue = BigInt(0);
   
@@ -342,162 +339,113 @@ export async function createToken(
     }
   }
   
-  const token = new TransferFeeToken(
-    connection, 
-    mint,
-    {
-      feeBasisPoints: feeBasisPoints,
-      maxFee: maxFeeValue,
-      transferFeeConfigAuthority: wallet.publicKey,
-      withdrawWithheldAuthority: wallet.publicKey
-    }
-  );
-  
-  // Lấy instructions để tạo account và mint
-  const { instructions: mintInstructions, address: tokenAccount } = 
-    await token.createAccountAndMintToInstructions(
-      wallet.publicKey, // owner
-      wallet.publicKey, // payer
-      mintAmount,       // amount
-      wallet.publicKey  // mintAuthority
-    );
-  
-  // BƯỚC 9: Tạo và gửi transaction tổng hợp
-  const combinedTransaction = new Transaction();
+  // BƯỚC 9: Tạo và gửi transaction tạo token
+  const createTransaction = new Transaction();
   
   // Lấy blockhash mới
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-  combinedTransaction.recentBlockhash = blockhash;
-  combinedTransaction.feePayer = wallet.publicKey;
+  createTransaction.recentBlockhash = blockhash;
+  createTransaction.feePayer = wallet.publicKey;
   
-  // Thêm tất cả các instructions theo thứ tự
-  // 1. Đầu tiên là các instructions để tạo token
-  createInstructions.forEach(ix => combinedTransaction.add(ix));
-  
-  // 2. Tiếp theo là các instructions để tạo account và mint
-  mintInstructions.forEach(ix => combinedTransaction.add(ix));
+  // Thêm các instructions để tạo token
+  createInstructions.forEach(ix => createTransaction.add(ix));
   
   // Thêm các signers (nếu có)
   if (signers.length > 0) {
-    combinedTransaction.partialSign(...signers);
+    createTransaction.partialSign(...signers);
   }
   
-  // Kiểm tra kích thước transaction để đảm bảo không vượt quá giới hạn
-  const serializedTx = combinedTransaction.serialize({requireAllSignatures: false});
-  const txSize = serializedTx.length;
-  
-  // Giới hạn kích thước của transaction Solana là khoảng 1232 bytes
-  const TX_SIZE_LIMIT = 1232;
-  
-  if (txSize > TX_SIZE_LIMIT) {
-    // BƯỚC 9.1: Gửi transaction tạo token
-    const createTransaction = new Transaction();
-    createTransaction.recentBlockhash = blockhash;
-    createTransaction.feePayer = wallet.publicKey;
-    createInstructions.forEach(ix => createTransaction.add(ix));
+  // Gửi giao dịch tạo token và chờ xác nhận
+  try {
+    const createSignature = await wallet.sendTransaction(
+      createTransaction,
+      connection,
+      { skipPreflight: false, preflightCommitment: 'confirmed' }
+    );
     
-    if (signers.length > 0) {
-      createTransaction.partialSign(...signers);
-    }
+    // Chờ xác nhận giao dịch
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature: createSignature
+    }, 'confirmed');
     
-    try {
-      const transactionSignature = await wallet.sendTransaction(
-        createTransaction,
-        connection,
-        { skipPreflight: false, preflightCommitment: 'confirmed' }
-      );
-      
-      await connection.confirmTransaction({
-        blockhash,
-        lastValidBlockHeight,
-        signature: transactionSignature
-      });
-      
-      // BƯỚC 9.2: Đợi một chút rồi gửi transaction mintTo
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Tạo và gửi mintTo transaction như đã làm trước đó
-      const mintTransaction = new Transaction();
-      mintTransaction.recentBlockhash = blockhash;
-      mintTransaction.feePayer = wallet.publicKey;
-      mintInstructions.forEach(ix => mintTransaction.add(ix));
-      
-      const mintToSignature = await wallet.sendTransaction(
-        mintTransaction,
-        connection,
-        { skipPreflight: false, preflightCommitment: 'confirmed' }
-      );
-      
-      await connection.confirmTransaction({
-        blockhash,
-        lastValidBlockHeight,
-        signature: mintToSignature
-      }, 'confirmed');
-      
-      return {
-        mint: mint.toString(),
-        signature: transactionSignature,
-        metadataUri: metadataUri
-      };
-    } catch (error: any) {
-      console.error("Error during token creation or minting:", error);
-      if (error.logs) {
-        console.error("Error logs:", error.logs);
+    console.log("Token creation successful with signature:", createSignature);
+    
+    // BƯỚC 10: Đợi một chút để đảm bảo blockchain đã cập nhật
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // BƯỚC 11: Tạo và khởi tạo token để mint
+    const token = new TransferFeeToken(
+      connection, 
+      mint,
+      {
+        feeBasisPoints: feeBasisPoints,
+        maxFee: maxFeeValue,
+        transferFeeConfigAuthority: wallet.publicKey,
+        withdrawWithheldAuthority: wallet.publicKey
       }
-      throw error;
+    );
+    
+    // Tính toán số lượng token để mint
+    const decimals = typeof tokenData.decimals === 'string' ? 
+      parseInt(tokenData.decimals) : tokenData.decimals;
+    
+    const supplyAmount = typeof tokenData.supply === 'string' ? 
+      parseFloat(tokenData.supply) : tokenData.supply;
+      
+    // Tính toán số lượng token với decimals
+    const mintAmount = BigInt(Math.floor(supplyAmount * Math.pow(10, decimals)));
+    
+    // Lấy instructions để tạo account và mint
+    const { instructions: mintInstructions } = 
+      await token.createAccountAndMintToInstructions(
+        wallet.publicKey, // owner
+        wallet.publicKey, // payer
+        mintAmount,       // amount
+        wallet.publicKey  // mintAuthority
+      );
+    
+    // Lấy blockhash mới cho giao dịch thứ hai
+    const mintBlockhashInfo = await connection.getLatestBlockhash('confirmed');
+    
+    // Tạo giao dịch mint token riêng biệt
+    const mintTransaction = new Transaction();
+    mintTransaction.recentBlockhash = mintBlockhashInfo.blockhash;
+    mintTransaction.feePayer = wallet.publicKey;
+    
+    // Thêm các instructions để mint token
+    mintInstructions.forEach(ix => mintTransaction.add(ix));
+    
+    // Gửi giao dịch mint token và chờ xác nhận
+    const mintSignature = await wallet.sendTransaction(
+      mintTransaction,
+      connection,
+      { skipPreflight: false, preflightCommitment: 'confirmed' }
+    );
+    
+    // Chờ xác nhận giao dịch
+    await connection.confirmTransaction({
+      blockhash: mintBlockhashInfo.blockhash,
+      lastValidBlockHeight: mintBlockhashInfo.lastValidBlockHeight,
+      signature: mintSignature
+    }, 'confirmed');
+    
+    console.log("Token minting successful with signature:", mintSignature);
+    
+    // Trả về kết quả thành công
+    return {
+      mint: mint.toString(),
+      signature: createSignature,
+      metadataUri: metadataUri
+    };
+    
+  } catch (error: any) {
+    console.error("Error during token creation:", error);
+    if (error.logs) {
+      console.error("Error logs:", error.logs);
     }
-  } else {
-    // Kích thước transaction không vượt quá giới hạn, gửi transaction tổng hợp
-    try {
-      const signature = await wallet.sendTransaction(
-        combinedTransaction,
-        connection,
-        { skipPreflight: false, preflightCommitment: 'confirmed' }
-      );
-      
-      await connection.confirmTransaction({
-        blockhash,
-        lastValidBlockHeight,
-        signature
-      }, 'confirmed');
-      
-      return {
-        mint: mint.toString(),
-        signature: signature,
-        metadataUri: metadataUri
-      };
-    } catch (error: any) {
-      console.error("Error during transaction:", error);
-      
-      if (error.logs) {
-        console.error("Transaction logs:", error.logs);
-      }
-      
-      try {
-        const retrySignature = await wallet.sendTransaction(
-          combinedTransaction,
-          connection,
-          { skipPreflight: true, preflightCommitment: 'confirmed' }
-        );
-        
-        await connection.confirmTransaction({
-          blockhash,
-          lastValidBlockHeight,
-          signature: retrySignature
-        }, 'confirmed');
-        
-        return {
-          mint: mint.toString(),
-          signature: retrySignature,
-          metadataUri: metadataUri
-        };
-      } catch (retryError: any) {
-        console.error("Retry also failed:", retryError);
-        
-        // Nếu giao dịch kết hợp thất bại, thử lại với 2 giao dịch riêng biệt
-        throw new Error("Combined transaction failed. Please try again with separate transactions.");
-      }
-    }
+    throw error;
   }
 }
 

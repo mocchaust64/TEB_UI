@@ -31,8 +31,8 @@ export const NETWORK_OPTIONS: NetworkOption[] = [
   {
     value: WalletAdapterNetwork.Mainnet,
     label: "Mainnet",
-    // Use Alchemy endpoint - in production, consider using environment variables for API keys
-    endpoint: "https://solana-mainnet.g.alchemy.com/v2/X6IFbQzZ3VPgX8FUu-MfXH-yHj8EwXlY",
+    // Use Helius endpoint
+    endpoint: "https://mainnet.helius-rpc.com/?api-key=4af2bd45-1ea8-4c53-a275-507832d70804",
     explorerUrl: "https://explorer.solana.com",
     color: "text-green-500"
   },
