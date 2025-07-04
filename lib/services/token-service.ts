@@ -1,5 +1,5 @@
 import { TokenBuilder ,TransferFeeToken, Token} from "solana-token-extension-boost";
-import { Connection, PublicKey, Commitment, ConnectionConfig, Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, Commitment, ConnectionConfig, Transaction, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import { pinJSONToIPFS, pinFileToIPFS, ipfsToHTTP, pinImageFromBase64 } from "@/lib/utils/pinata";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { 
@@ -12,7 +12,6 @@ import { saveTokensToCache } from "../utils/token-cache";
 import { toast } from "sonner";
 
 
-// Interface cho token data
 export interface TokenData {
   name: string;
   symbol: string;
@@ -28,13 +27,11 @@ export interface TokenData {
   discordUrl?: string;
 }
 
-// Interface cho extension config
 export interface ExtensionConfig {
   id: string;
   options?: Record<string, any>;
 }
 
-// Interface cho kết quả tạo token
 export interface TokenCreationResult {
   mint: string;
   signature: string;
@@ -42,7 +39,7 @@ export interface TokenCreationResult {
 }
 
 /**
- * Tạo token với metadata và các extensions
+ * Create token with metadata and extensions
  * @param connection Solana connection
  * @param wallet Wallet context
  * @param tokenData Token data
@@ -58,6 +55,19 @@ export async function createToken(
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
   }
+  
+  // Kiểm tra xem có phải tạo token với transfer hook whitelist không
+  if (selectedExtensions.includes("transfer-hook") && 
+      tokenData.extensionOptions?.["transfer-hook"]?.["program-id"] === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ") {
+    // Gọi hàm tối ưu để giảm số lần ký xuống còn 2 lần
+    return createTokenWithTransferHookAndWhitelist(connection, wallet, tokenData, selectedExtensions);
+  }
+  
+  // Biến để lưu thông tin transfer hook cần khởi tạo whitelist
+  let transferHookToInitialize: {
+    programId: PublicKey,
+    mint: PublicKey | null
+  } | null = null;
   
   // BƯỚC 1: Xử lý thông tin ảnh (đã có URL hoặc base64)
   let imageUri = "";
@@ -100,8 +110,7 @@ export async function createToken(
           throw new Error("Failed to get valid image URI after upload");
         }
       } catch (uploadError) {
-        // Thử tải lại với cách khác nếu thất bại
-        // Xử lý dữ liệu base64 trực tiếp
+     
         if (base64Data.includes(',')) {
           base64Data = base64Data.split(',')[1];
         }
@@ -116,8 +125,7 @@ export async function createToken(
     }
   }
   
-  // BƯỚC 2: Tạo metadata đầy đủ (offchain) cho IPFS theo chuẩn Metaplex
-  // Tạo metadata theo đúng chuẩn Metaplex Fungible Asset Standard
+
   const metadataBase: Record<string, any> = {
     name: tokenData.name,
     symbol: tokenData.symbol,
@@ -226,19 +234,21 @@ export async function createToken(
   const tokenBuilder = new TokenBuilder(enhancedConnection)
     .setTokenInfo(
       decimals,
-      wallet.publicKey  // Mint authority
+      wallet.publicKey  
     )
-    .addTokenMetadata(
-      tokenData.name,
-      tokenData.symbol,
-      metadataUri,
-      additionalMetadata
-    );
+
   
   // BƯỚC 8: Thêm các extensions theo cấu hình
   for (const extensionId of selectedExtensions) {
     // Bỏ qua metadata vì đã được thêm
-    if (extensionId === "metadata" || extensionId === "metadata-pointer") continue;
+    if (extensionId === "metadata" || extensionId === "metadata-pointer"){
+      tokenBuilder.addTokenMetadata(
+        tokenData.name,
+        tokenData.symbol,
+        metadataUri,
+        additionalMetadata
+      );
+    }
     
     if (extensionId === "transfer-fees" && tokenData.extensionOptions?.["transfer-fees"]) {
       const feePercentage = parseFloat(tokenData.extensionOptions["transfer-fees"]["fee-percentage"] || "1");
@@ -286,7 +296,7 @@ export async function createToken(
     else if (extensionId === "default-account-state") {
       // Thêm xử lý cho DefaultAccountState extension
       // Luôn sử dụng trạng thái frozen (1)
-      const defaultState = 1; // Mặc định luôn là frozen
+      const defaultState = 1; 
       
       // Lấy freeze authority nếu có, mặc định là ví người dùng
       const freezeAuthority = tokenData.extensionOptions?.["default-account-state"]?.["freeze-authority"] 
@@ -304,6 +314,14 @@ export async function createToken(
       
       // Thêm extension TransferHook
       tokenBuilder.addTransferHook(hookProgramId);
+      
+    
+      if (hookProgramId.toString() === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ") {
+        transferHookToInitialize = {
+          programId: hookProgramId,
+          mint: null // Sẽ được cập nhật sau khi mint được tạo
+        };
+      }
     }
     // Có thể thêm các extension khác ở đây
   }
@@ -374,6 +392,40 @@ export async function createToken(
     
     // BƯỚC 10: Đợi một chút để đảm bảo blockchain đã cập nhật
     await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Nếu có transfer hook whitelist cần khởi tạo
+    if (transferHookToInitialize !== null) {
+      // Cập nhật mint
+      transferHookToInitialize.mint = mint;
+      
+      // Chỉ tự động khởi tạo whitelist và ExtraAccountMetaList nếu đó là địa chỉ hook 12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ
+      if (transferHookToInitialize.programId.toString() === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ") {
+        try {
+          // Khởi tạo whitelist và ExtraAccountMetaList
+          const whitelistResult = await initializeTransferHookWhitelist(
+            connection,
+            wallet,
+            transferHookToInitialize.mint,
+            transferHookToInitialize.programId
+          );
+          
+          if (whitelistResult === "user-rejected") {
+            console.log("Người dùng đã từ chối ký transaction khởi tạo whitelist");
+            toast.info("Bạn đã từ chối ký transaction khởi tạo whitelist. Token vẫn được tạo thành công.");
+          } else if (whitelistResult.startsWith("whitelist-initialization")) {
+            console.log("Whitelist initialization skipped or failed");
+            toast.warning("Whitelist được tạo không thành công. Bạn có thể thử lại sau.");
+          } else {
+            console.log("Transfer Hook Whitelist khởi tạo thành công:", whitelistResult);
+            toast.success("Whitelist được tạo thành công");
+          }
+        } catch (error) {
+          // Xử lý lỗi nhưng không dừng quá trình tạo token
+          console.error("Lỗi khi khởi tạo Transfer Hook Whitelist:", error);
+          toast.warning("Whitelist được tạo không thành công. Bạn có thể thử lại sau.");
+        }
+      }
+    }
     
     // BƯỚC 11: Tạo và khởi tạo token để mint
     const token = new TransferFeeToken(
@@ -920,6 +972,519 @@ export async function updateDefaultAccountState(
     return signature;
   } catch (error) {
     console.error("Error updating default account state:", error);
+    throw error;
+  }
+}
+
+/**
+ * Hàm khởi tạo Transfer Hook Whitelist và ExtraAccountMetaList
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param mint Địa chỉ mint có transfer hook
+ * @param transferHookProgramId Program ID của transfer hook (whitelist)
+ * @returns Kết quả khởi tạo
+ */
+export async function initializeTransferHookWhitelist(
+  connection: Connection,
+  wallet: WalletContextState,
+  mint: PublicKey,
+  transferHookProgramId: PublicKey
+): Promise<string> {
+  try {
+    if (!wallet.publicKey) {
+      throw new Error("Wallet not connected");
+    }
+
+    // Tính PDA cho whitelist và ExtraAccountMetaList
+    const [whitelistPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("white_list"), mint.toBuffer()],
+      transferHookProgramId
+    );
+    
+    const [extraAccountMetaListPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("extra-account-metas"), mint.toBuffer()],
+      transferHookProgramId
+    );
+
+    // Kiểm tra xem tài khoản whitelist đã tồn tại chưa
+    let whitelistAccount;
+    try {
+      whitelistAccount = await connection.getAccountInfo(whitelistPDA);
+    } catch (error) {
+      console.log("Error checking whitelist account:", error);
+      whitelistAccount = null;
+    }
+    
+    // Nếu chưa tồn tại, tạo ExtraAccountMetaList và Whitelist
+    if (!whitelistAccount) {
+      try {
+        console.log("Creating whitelist and extra account meta list...");
+        
+        // Tạo instruction để khởi tạo ExtraAccountMetaList
+        const initializeDiscriminator = Buffer.from([43,34,13,49,167,88,235,235]);
+        
+        const initializeIx = new TransactionInstruction({
+          keys: [
+            { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // payer
+            { pubkey: extraAccountMetaListPDA, isSigner: false, isWritable: true }, // extraAccountMetaList
+            { pubkey: mint, isSigner: false, isWritable: false }, // mint
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // systemProgram
+            { pubkey: whitelistPDA, isSigner: false, isWritable: true }, // whiteList
+          ],
+          programId: transferHookProgramId,
+          data: initializeDiscriminator
+        });
+        
+        // Tạo và gửi transaction
+        const initTx = new Transaction();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        initTx.recentBlockhash = blockhash;
+        initTx.feePayer = wallet.publicKey;
+        initTx.add(initializeIx);
+        
+        // Gửi transaction để người dùng ký bằng Phantom
+        const signature = await wallet.sendTransaction(initTx, connection);
+        
+        // Đợi xác nhận
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight
+        }, 'confirmed');
+        
+        console.log("ExtraAccountMetaList initialized with signature:", signature);
+        
+        // Đợi một chút để đảm bảo blockchain đã cập nhật
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error: any) {
+        console.error("Error initializing ExtraAccountMetaList:", error);
+        if (error.message && error.message.includes("User rejected")) {
+          return "user-rejected";
+        }
+        // Nếu lỗi không phải do người dùng từ chối, tiếp tục thực hiện bước tiếp theo
+      }
+    }
+
+    // Thêm địa chỉ người tạo vào whitelist
+    try {
+      console.log("Adding creator to whitelist...");
+      
+      const addToWhitelistDiscriminator = Buffer.from([157,211,52,54,144,81,5,55]);
+      
+      const addToWhitelistIx = new TransactionInstruction({
+        keys: [
+          { pubkey: wallet.publicKey, isSigner: false, isWritable: false }, // newAccount (địa chỉ cần thêm vào whitelist)
+          { pubkey: mint, isSigner: false, isWritable: false }, // mint
+          { pubkey: whitelistPDA, isSigner: false, isWritable: true }, // whiteList
+          { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // signer
+        ],
+        programId: transferHookProgramId,
+        data: addToWhitelistDiscriminator
+      });
+      
+      // Tạo và gửi transaction
+      const addTx = new Transaction();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      addTx.recentBlockhash = blockhash;
+      addTx.feePayer = wallet.publicKey;
+      addTx.add(addToWhitelistIx);
+      
+      // Gửi transaction để người dùng ký bằng Phantom
+      const addSignature = await wallet.sendTransaction(addTx, connection);
+      
+      // Đợi xác nhận
+      await connection.confirmTransaction({
+        signature: addSignature,
+        blockhash,
+        lastValidBlockHeight
+      }, 'confirmed');
+      
+      console.log("Address added to whitelist with signature:", addSignature);
+      
+      return addSignature;
+    } catch (error: any) {
+      console.error("Error adding address to whitelist:", error);
+      if (error.message && error.message.includes("User rejected")) {
+        return "user-rejected";
+      }
+      return "whitelist-initialization-skipped";
+    }
+  } catch (error) {
+    console.error("Error initializing transfer hook whitelist:", error);
+    return "whitelist-initialization-failed";
+  }
+}
+
+/**
+ * Hàm tạo token với transfer hook và khởi tạo whitelist trong cùng một transaction
+ * @param connection Solana connection
+ * @param wallet Wallet context
+ * @param tokenData Token data
+ * @param selectedExtensions Selected extensions
+ * @returns Token creation result
+ */
+export async function createTokenWithTransferHookAndWhitelist(
+  connection: Connection,
+  wallet: WalletContextState,
+  tokenData: TokenData,
+  selectedExtensions: string[]
+): Promise<TokenCreationResult> {
+  if (!wallet.publicKey) {
+    throw new Error("Wallet not connected");
+  }
+  
+  // BƯỚC 1: Xử lý thông tin ảnh và metadata giống như trong createToken
+  let imageUri = "";
+  let imageHttpUrl = "";
+
+  if (tokenData.imageUrl) {
+    imageHttpUrl = tokenData.imageUrl;
+    if (!imageHttpUrl.startsWith('http')) {
+      if (imageHttpUrl.startsWith('ipfs://')) {
+        imageHttpUrl = ipfsToHTTP(imageHttpUrl);
+      } else {
+        imageHttpUrl = `https://gateway.pinata.cloud/ipfs/${imageHttpUrl}`;
+      }
+    }
+  } else if (tokenData.imageBase64) {
+    try {
+      let base64Data = tokenData.imageBase64;
+      if (!base64Data.startsWith('data:image')) {
+        base64Data = `data:image/png;base64,${base64Data}`;
+      }
+      
+      try {
+        imageUri = await pinImageFromBase64(base64Data);
+        imageHttpUrl = ipfsToHTTP(imageUri);
+        if (!imageUri || !imageHttpUrl || imageHttpUrl.trim() === '') {
+          throw new Error("Failed to get valid image URI after upload");
+        }
+      } catch (uploadError) {
+        if (base64Data.includes(',')) {
+          base64Data = base64Data.split(',')[1];
+        }
+        imageUri = await pinFileToIPFS(base64Data, `${tokenData.name.toLowerCase()}-image`);
+        imageHttpUrl = ipfsToHTTP(imageUri);
+      }
+    } catch (error) {
+      imageHttpUrl = "";
+    }
+  }
+
+  // Tạo metadata
+  const metadataBase: Record<string, any> = {
+    name: tokenData.name,
+    symbol: tokenData.symbol,
+    description: tokenData.description || "",
+    seller_fee_basis_points: 0,
+    attributes: [
+      { trait_type: "Decimals", value: tokenData.decimals },
+      { trait_type: "Supply", value: tokenData.supply }
+    ]
+  };
+
+  if (imageHttpUrl && imageHttpUrl.trim() !== '') {
+    metadataBase.image = imageHttpUrl;
+    metadataBase.properties = {
+      files: [{ uri: imageHttpUrl, type: "image/png" }],
+      category: "image",
+      creators: [{ address: wallet.publicKey.toString(), share: 100 }]
+    };
+  } else {
+    metadataBase.properties = {
+      category: "image",
+      creators: [{ address: wallet.publicKey.toString(), share: 100 }]
+    };
+  }
+
+  metadataBase.collection = {
+    name: tokenData.name,
+    family: "Token-2022"
+  };
+
+  if (tokenData.websiteUrl && tokenData.websiteUrl.trim() !== '') {
+    metadataBase.external_url = tokenData.websiteUrl;
+  }
+
+  // Tải metadata lên IPFS
+  let metadataUri: string;
+  try {
+    const ipfsUri = await pinJSONToIPFS(metadataBase);
+    metadataUri = ipfsToHTTP(ipfsUri);
+  } catch (error) {
+    metadataUri = `https://arweave.net/${tokenData.name.toLowerCase()}-${tokenData.symbol.toLowerCase()}`;
+  }
+
+  // Thiết lập connection
+  const connectionConfig: ConnectionConfig = {
+    commitment: 'confirmed' as Commitment,
+    confirmTransactionInitialTimeout: 60000
+  };
+  
+  const enhancedConnection = new Connection(
+    connection.rpcEndpoint, 
+    connectionConfig
+  );
+
+  // Tạo additionalMetadata
+  const additionalMetadata: Record<string, string> = {};
+  if (tokenData.description) additionalMetadata["description"] = tokenData.description;
+  if (tokenData.websiteUrl) additionalMetadata["website"] = tokenData.websiteUrl;
+  if (tokenData.twitterUrl) additionalMetadata["twitter"] = tokenData.twitterUrl;
+  if (tokenData.telegramUrl) additionalMetadata["telegram"] = tokenData.telegramUrl;
+  if (tokenData.discordUrl) additionalMetadata["discord"] = tokenData.discordUrl;
+
+  // Chuẩn bị thông tin về token
+  const decimals = typeof tokenData.decimals === 'string' ? 
+    parseInt(tokenData.decimals) : tokenData.decimals;
+  
+  const supplyAmount = typeof tokenData.supply === 'string' ? 
+    parseFloat(tokenData.supply) : tokenData.supply;
+    
+  const mintAmount = BigInt(Math.floor(supplyAmount * Math.pow(10, decimals)));
+
+  // Khởi tạo TokenBuilder
+  const tokenBuilder = new TokenBuilder(enhancedConnection)
+    .setTokenInfo(
+      decimals,
+      wallet.publicKey  
+    );
+
+  // Kiểm tra xem có transfer hook không và lưu thông tin
+  let transferHookProgramId: PublicKey | null = null;
+  let isWhitelistHook = false;
+
+  // Thêm các extensions theo cấu hình
+  for (const extensionId of selectedExtensions) {
+    if (extensionId === "metadata" || extensionId === "metadata-pointer") {
+      tokenBuilder.addTokenMetadata(
+        tokenData.name,
+        tokenData.symbol,
+        metadataUri,
+        additionalMetadata
+      );
+    } else if (extensionId === "transfer-fees" && tokenData.extensionOptions?.["transfer-fees"]) {
+      const feePercentage = parseFloat(tokenData.extensionOptions["transfer-fees"]["fee-percentage"] || "1");
+      const feeBasisPoints = feePercentage * 100;
+      
+      let maxFeeValue: bigint;
+      if (tokenData.extensionOptions["transfer-fees"]["max-fee"]) {
+        const maxFeeInput = tokenData.extensionOptions["transfer-fees"]["max-fee"];
+        const maxFeeAmount = parseFloat(maxFeeInput);
+        maxFeeValue = BigInt(Math.floor(maxFeeAmount * Math.pow(10, decimals)));
+      } else {
+        maxFeeValue = BigInt(Math.pow(10, decimals));
+      }
+      
+      tokenBuilder.addTransferFee(
+        feeBasisPoints,
+        maxFeeValue,
+        wallet.publicKey,
+        wallet.publicKey
+      );
+    } else if (extensionId === "non-transferable") {
+      tokenBuilder.addNonTransferable();
+    } else if (extensionId === "permanent-delegate" && tokenData.extensionOptions?.["permanent-delegate"]) {
+      const delegateAddress = new PublicKey(tokenData.extensionOptions["permanent-delegate"]["delegate-address"] || wallet.publicKey.toString());
+      tokenBuilder.addPermanentDelegate(delegateAddress);
+    } else if (extensionId === "interest-bearing" && tokenData.extensionOptions?.["interest-bearing"]) {
+      const rate = parseFloat(tokenData.extensionOptions["interest-bearing"]["interest-rate"] || "5");
+      tokenBuilder.addInterestBearing(rate * 100, wallet.publicKey);
+    } else if (extensionId === "mint-close-authority" && tokenData.extensionOptions?.["mint-close-authority"]) {
+      const closeAuthorityAddress = new PublicKey(tokenData.extensionOptions["mint-close-authority"]["close-authority"] || wallet.publicKey.toString());
+      tokenBuilder.addMintCloseAuthority(closeAuthorityAddress);
+    } else if (extensionId === "default-account-state") {
+      const defaultState = 1;
+      const freezeAuthority = tokenData.extensionOptions?.["default-account-state"]?.["freeze-authority"] 
+        ? new PublicKey(tokenData.extensionOptions["default-account-state"]["freeze-authority"])
+        : wallet.publicKey;
+      
+      tokenBuilder.addDefaultAccountState(defaultState, freezeAuthority);
+    } else if (extensionId === "transfer-hook" && tokenData.extensionOptions?.["transfer-hook"]) {
+      transferHookProgramId = tokenData.extensionOptions["transfer-hook"]["program-id"]
+        ? new PublicKey(tokenData.extensionOptions["transfer-hook"]["program-id"])
+        : wallet.publicKey;
+      
+      tokenBuilder.addTransferHook(transferHookProgramId);
+      
+      // Kiểm tra xem đây có phải là hook whitelist không
+      isWhitelistHook = transferHookProgramId.toString() === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ";
+    }
+  }
+
+  // BƯỚC 2: Tạo và gửi transaction đầu tiên (tạo token với extension)
+  const { instructions: createInstructions, signers, mint } = 
+    await tokenBuilder.createTokenInstructions(wallet.publicKey);
+
+  const useToken2022 = selectedExtensions.filter(ext => ext !== "metadata" && ext !== "metadata-pointer").length > 0;
+  const tokenProgramId = useToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+
+  // Tạo transaction đầu tiên để tạo token
+  const createTransaction = new Transaction();
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  createTransaction.recentBlockhash = blockhash;
+  createTransaction.feePayer = wallet.publicKey;
+  createInstructions.forEach(ix => createTransaction.add(ix));
+  
+  if (signers.length > 0) {
+    createTransaction.partialSign(...signers);
+  }
+  
+  // Gửi transaction đầu tiên
+  try {
+    const createSignature = await wallet.sendTransaction(
+      createTransaction,
+      connection,
+      { skipPreflight: false, preflightCommitment: 'confirmed' }
+    );
+    
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature: createSignature
+    }, 'confirmed');
+    
+    console.log("Token creation successful with signature:", createSignature);
+    
+    // Đợi để đảm bảo blockchain đã cập nhật
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // BƯỚC 3: Tạo transaction thứ hai (mint token + khởi tạo whitelist)
+    // Khởi tạo token để mint
+    let feeBasisPoints = 0;
+    let maxFeeValue = BigInt(0);
+    
+    if (selectedExtensions.includes("transfer-fees") && tokenData.extensionOptions?.["transfer-fees"]) {
+      const feePercentage = parseFloat(tokenData.extensionOptions["transfer-fees"]["fee-percentage"] || "1");
+      feeBasisPoints = feePercentage * 100;
+      
+      if (tokenData.extensionOptions["transfer-fees"]["max-fee"]) {
+        const maxFeeInput = tokenData.extensionOptions["transfer-fees"]["max-fee"];
+        const maxFeeAmount = parseFloat(maxFeeInput);
+        maxFeeValue = BigInt(Math.floor(maxFeeAmount * Math.pow(10, decimals)));
+      } else {
+        maxFeeValue = BigInt(Math.pow(10, decimals));
+      }
+    }
+    
+    const token = new TransferFeeToken(
+      connection, 
+      mint,
+      {
+        feeBasisPoints: feeBasisPoints,
+        maxFee: maxFeeValue,
+        transferFeeConfigAuthority: wallet.publicKey,
+        withdrawWithheldAuthority: wallet.publicKey
+      }
+    );
+    
+    // Lấy instructions để mint token
+    const { instructions: mintInstructions } = 
+      await token.createAccountAndMintToInstructions(
+        wallet.publicKey, // owner
+        wallet.publicKey, // payer
+        mintAmount,       // amount
+        wallet.publicKey  // mintAuthority
+      );
+    
+    // Tạo transaction thứ hai
+    const combinedTransaction = new Transaction();
+    const mintBlockhashInfo = await connection.getLatestBlockhash('confirmed');
+    combinedTransaction.recentBlockhash = mintBlockhashInfo.blockhash;
+    combinedTransaction.feePayer = wallet.publicKey;
+    
+    // Thêm mint instructions
+    mintInstructions.forEach(ix => combinedTransaction.add(ix));
+    
+    // Nếu có transfer hook whitelist cần khởi tạo, thêm các instructions này
+    if (isWhitelistHook && transferHookProgramId) {
+      // Tính PDA cho whitelist và ExtraAccountMetaList
+      const [whitelistPDA] = PublicKey.findProgramAddressSync(
+        [Buffer.from("white_list"), mint.toBuffer()],
+        transferHookProgramId
+      );
+      
+      const [extraAccountMetaListPDA] = PublicKey.findProgramAddressSync(
+        [Buffer.from("extra-account-metas"), mint.toBuffer()],
+        transferHookProgramId
+      );
+      
+      // Tạo instruction để khởi tạo ExtraAccountMetaList
+      const initializeDiscriminator = Buffer.from([43,34,13,49,167,88,235,235]);
+      const initializeIx = new TransactionInstruction({
+        keys: [
+          { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // payer
+          { pubkey: extraAccountMetaListPDA, isSigner: false, isWritable: true }, // extraAccountMetaList
+          { pubkey: mint, isSigner: false, isWritable: false }, // mint
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // systemProgram
+          { pubkey: whitelistPDA, isSigner: false, isWritable: true }, // whiteList
+        ],
+        programId: transferHookProgramId,
+        data: initializeDiscriminator
+      });
+      
+      // Thêm instruction khởi tạo whitelist
+      combinedTransaction.add(initializeIx);
+      
+      // Tạo instruction để thêm địa chỉ người tạo vào whitelist
+      const addToWhitelistDiscriminator = Buffer.from([157,211,52,54,144,81,5,55]);
+      const addToWhitelistIx = new TransactionInstruction({
+        keys: [
+          { pubkey: wallet.publicKey, isSigner: false, isWritable: false }, // newAccount
+          { pubkey: mint, isSigner: false, isWritable: false }, // mint
+          { pubkey: whitelistPDA, isSigner: false, isWritable: true }, // whiteList
+          { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // signer
+        ],
+        programId: transferHookProgramId,
+        data: addToWhitelistDiscriminator
+      });
+      
+      // Thêm instruction thêm địa chỉ vào whitelist
+      combinedTransaction.add(addToWhitelistIx);
+    }
+    
+    // Gửi transaction kết hợp
+    try {
+      const combinedSignature = await wallet.sendTransaction(
+        combinedTransaction,
+        connection,
+        { skipPreflight: false, preflightCommitment: 'confirmed' }
+      );
+      
+      await connection.confirmTransaction({
+        blockhash: mintBlockhashInfo.blockhash,
+        lastValidBlockHeight: mintBlockhashInfo.lastValidBlockHeight,
+        signature: combinedSignature
+      }, 'confirmed');
+      
+      console.log("Token minting and whitelist initialization successful with signature:", combinedSignature);
+      
+      // Trả về kết quả thành công
+      return {
+        mint: mint.toString(),
+        signature: createSignature,
+        metadataUri: metadataUri
+      };
+      
+    } catch (error: any) {
+      console.error("Error during token minting and whitelist initialization:", error);
+      
+      // Vẫn trả về thông tin mint vì token đã được tạo thành công
+      toast.warning("Token đã được tạo, nhưng mint và whitelist không thành công. Lỗi: " + 
+        (error.message || "Không xác định"));
+        
+      return {
+        mint: mint.toString(),
+        signature: createSignature,
+        metadataUri: metadataUri
+      };
+    }
+    
+  } catch (error: any) {
+    console.error("Error during token creation:", error);
+    if (error.logs) {
+      console.error("Error logs:", error.logs);
+    }
     throw error;
   }
 }

@@ -21,7 +21,11 @@ import {
   FileText, 
   Upload,
   Info,
-  Webhook
+  Webhook,
+  ArrowLeft, 
+  ArrowRight, 
+  CheckCircle,
+  Image as ImageIcon
 } from "lucide-react"
 import { 
   Tooltip,
@@ -32,6 +36,9 @@ import {
 import { PageLoadingSkeleton } from "@/components/loading-skeleton"
 import { uploadImageAndGetUrl } from "@/lib/utils/pinata"
 import { toast } from "sonner"
+import { PublicKey } from "@solana/web3.js"
+import { initializeTransferHookWhitelist, createToken, createTokenWithTransferHookAndWhitelist, TokenCreationResult } from "@/lib/services/token-service"
+import { useWallet, useConnection } from "@solana/wallet-adapter-react"
 
 // Định nghĩa các kiểu dữ liệu cho token extensions
 type TextOptionType = {
@@ -74,6 +81,7 @@ type TokenExtensionType = {
   isRequired?: boolean
   disabled?: boolean
   disabledReason?: string
+  infoMessage?: string
 }
 
 // Function để validate public key
@@ -276,7 +284,8 @@ const tokenExtensions: TokenExtensionType[] = [
         required: true,
         validator: validatePublicKey
       }
-    ]
+    ],
+    infoMessage: "When using program ID 12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ, whitelist and ExtraAccountMetaList will be automatically initialized."
   }
 ]
 
@@ -355,6 +364,8 @@ const ExtensionOptionInput = ({
 
 // Component chính
 export default function CreateToken() {
+  const { connection } = useConnection();
+  const wallet = useWallet();
   const [isLoading, setIsLoading] = useState(true)
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>(["metadata", "metadata-pointer"])
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -381,6 +392,10 @@ export default function CreateToken() {
     telegramUrl: "",
     discordUrl: ""
   })
+  const [isCreating, setIsCreating] = useState(false);
+  const [isCreated, setIsCreated] = useState(false);
+  const [mint, setMint] = useState<string>("");
+  const [createdTokenInfo, setCreatedTokenInfo] = useState<TokenCreationResult | null>(null);
 
   useEffect(() => {
     // Mô phỏng việc tải dữ liệu
@@ -742,7 +757,7 @@ export default function CreateToken() {
     return isValid;
   };
 
-  const handleCreateToken = () => {
+  const handleCreateToken = async () => {
     // Validate dữ liệu trước khi tiếp tục
     if (!validateTokenData()) {
       return;
@@ -750,24 +765,81 @@ export default function CreateToken() {
     
     // Lưu dữ liệu token vào localStorage để trang review có thể truy cập
     if (typeof window !== 'undefined') {
-          const dataToSave = {
-            name: tokenData.name,
-            symbol: tokenData.symbol,
-            decimals: tokenData.decimals,
-            supply: tokenData.supply,
-            description: tokenData.description,
-            extensionOptions: tokenData.extensionOptions,
-            selectedExtensions,
+      const dataToSave = {
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+        decimals: tokenData.decimals,
+        supply: tokenData.supply,
+        description: tokenData.description,
+        extensionOptions: tokenData.extensionOptions,
+        selectedExtensions,
         imageUrl: tokenData.imageUrl,
         websiteUrl: tokenData.websiteUrl,
         twitterUrl: tokenData.twitterUrl,
         telegramUrl: tokenData.telegramUrl,
         discordUrl: tokenData.discordUrl
-        };
-        localStorage.setItem('tokenData', JSON.stringify(dataToSave));
-        window.location.href = '/create/review';
+      };
+      localStorage.setItem('tokenData', JSON.stringify(dataToSave));
+      window.location.href = '/create/review';
     }
-  }
+
+    try {
+      setIsCreating(true);
+      
+      // Kiểm tra xem có sử dụng transfer hook whitelist không
+      const hasTransferHookWhitelist = 
+        selectedExtensions.includes("transfer-hook") && 
+        tokenData.extensionOptions?.["transfer-hook"]?.["program-id"] === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ";
+      
+      let result: TokenCreationResult;
+      
+      // Sử dụng hàm tạo token phù hợp dựa trên việc có whitelist hay không
+      if (hasTransferHookWhitelist) {
+        // Sử dụng hàm kết hợp để giảm số lần ký xuống 2
+        result = await createTokenWithTransferHookAndWhitelist(connection, wallet, tokenData, selectedExtensions);
+        toast.success("Token được tạo thành công với whitelist đã được khởi tạo");
+      } else {
+        // Sử dụng hàm tạo token thông thường
+        result = await createToken(connection, wallet, tokenData, selectedExtensions);
+      }
+      
+      // Cập nhật state và hiển thị thông báo thành công
+      setMint(result.mint);
+      setCreatedTokenInfo(result);
+      setIsCreated(true);
+      toast.success("Token created successfully!");
+      
+      // Nếu đã tạo token thành công và có transfer hook nhưng chưa khởi tạo whitelist
+      if (!hasTransferHookWhitelist && 
+          selectedExtensions.includes("transfer-hook") && 
+          tokenData.extensionOptions?.["transfer-hook"]?.["program-id"] === "12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ") {
+        toast("Token đã được tạo thành công", {
+          description: "Nếu bạn gặp lỗi khi tạo whitelist, bạn có thể thử lại.",
+          action: {
+            label: "Tạo lại whitelist",
+            onClick: () => {
+              // Gọi hàm để tạo lại whitelist
+              initializeTransferHookWhitelist(
+                connection, 
+                wallet, 
+                new PublicKey(result.mint), 
+                new PublicKey("12BZr6af3s7qf7GGmhBvMd46DWmVNhHfXmCwftfMk1mZ")
+              ).then((signature: string) => {
+                toast.success("Whitelist được tạo thành công");
+              }).catch((error: Error) => {
+                toast.error("Lỗi khi tạo whitelist: " + error.message);
+              });
+            }
+          }
+        });
+      }
+    } catch (error: any) {
+      console.error("Error creating token:", error);
+      toast.error(`Failed to create token: ${error.message}`);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (isLoading) {
     return <PageLoadingSkeleton />
@@ -1102,6 +1174,15 @@ export default function CreateToken() {
                                           When users transfer tokens, fees are automatically deducted and sent to the
                                           configured Fee Receiver address.
                                         </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {extension.infoMessage && (
+                                    <div className="bg-gray-800/50 rounded-lg p-2 sm:p-3 text-gray-400 text-xs mt-3">
+                                      <div className="flex items-start">
+                                        <Info className="w-3 h-3 mr-1 mt-0.5 shrink-0" />
+                                        <span>{extension.infoMessage}</span>
                                       </div>
                                     </div>
                                   )}
