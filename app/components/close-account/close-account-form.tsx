@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { toast } from "sonner";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Loader2, Wallet, ArrowRight, ExternalLink, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
-import { PublicKey, Transaction, SystemProgram, clusterApiUrl } from "@solana/web3.js";
+import { Loader2, Wallet, ExternalLink, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   createCloseAccountInstruction,
@@ -421,24 +421,55 @@ export default function CloseAccountForm() {
       }
 
       // Send transaction
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
       const signedTransaction = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize(),
-        {
-          skipPreflight: false,
-          preflightCommitment: "confirmed",
-        }
-      );
+      
+      let signature;
+      try {
+        // Gửi giao dịch với skipPreflight=false để đảm bảo kiểm tra đầy đủ
+        signature = await connection.sendRawTransaction(
+          signedTransaction.serialize(),
+          {
+            skipPreflight: false,
+            preflightCommitment: "confirmed",
+          }
+        );
 
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight,
-      });
+        // Xác nhận giao dịch
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        }, 'confirmed');
+      } catch (error: any) {
+        // Xử lý trường hợp giao dịch đã được xử lý trước đó
+        if (error.message && error.message.includes('already been processed')) {
+          console.log('Transaction has already been processed, checking status...');
+          
+          // Lấy signature từ lỗi nếu có
+          const errorMatch = error.message.match(/Signature (\w+) has already been processed/);
+          if (errorMatch && errorMatch[1]) {
+            signature = errorMatch[1];
+          } else if (error.signature) {
+            signature = error.signature;
+          } else {
+            throw new Error('Transaction failed: ' + error.message);
+          }
+          
+          // Kiểm tra trạng thái giao dịch
+          const status = await connection.getSignatureStatus(signature);
+          if (!status || status.value === null || status.value.err) {
+            throw new Error('Transaction failed to confirm: ' + JSON.stringify(status?.value?.err || 'unknown error'));
+          }
+          
+          console.log('Transaction was actually successful:', signature);
+        } else {
+          throw error;
+        }
+      }
 
       // Track successful account closure with Analytics
       trackAccountClosure(true, {
