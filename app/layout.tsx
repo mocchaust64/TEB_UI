@@ -64,6 +64,18 @@ export default function RootLayout({
             });
           `
         }} />
+        {/* Google Analytics */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-9SGC057FTB" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-9SGC057FTB');
+            `,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <SolanaWalletProvider>

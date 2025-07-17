@@ -59,6 +59,15 @@ const tokenTools: TokenTool[] = [
     category: "management"
   },
   {
+    id: "close-account",
+    name: "Close Account",
+    description: "Close token accounts with zero balance and reclaim SOL rent",
+    icon: <Wallet className="w-8 h-8 text-blue-400" />,
+    color: "from-blue-500/20 to-sky-500/20",
+    href: "/tools/close-account",
+    category: "management"
+  },
+  {
     id: "delegate-transfer",
     name: "Permanent Delegate Recovery",
     description: "Recover tokens from other wallets using Permanent Delegate authority",
