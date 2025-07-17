@@ -72,7 +72,13 @@ export default function RootLayout({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'G-9SGC057FTB');
+              gtag('config', 'G-9SGC057FTB', {
+                send_page_view: true,
+                cookie_flags: 'max-age=7200;secure;samesite=none',
+                transport_type: 'beacon',
+                allow_google_signals: true,
+                allow_ad_personalization_signals: false
+              });
             `,
           }}
         />

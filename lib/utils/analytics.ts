@@ -8,11 +8,26 @@ export const sendGAEvent = (
   }
 ) => {
   if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', eventName, eventParams);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Analytics event sent:', eventName, eventParams);
+    try {
+      // Đảm bảo có các tham số cần thiết cho sự kiện GA4
+      const enhancedParams = {
+        ...eventParams,
+        send_to: 'G-9SGC057FTB',
+        non_interaction: false,
+        event_timestamp: new Date().getTime()
+      };
+      
+      // Gửi sự kiện với tham số nâng cao
+      window.gtag('event', eventName, enhancedParams);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Analytics event sent:', eventName, enhancedParams);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error sending analytics event:', error);
+      return false;
     }
-    return true;
   }
   return false;
 };

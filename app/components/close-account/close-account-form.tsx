@@ -12,12 +12,10 @@ import { Loader2, Wallet, ArrowRight, ExternalLink, CheckCircle2, AlertCircle, R
 import { PublicKey, Transaction, SystemProgram, clusterApiUrl } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddress,
   createCloseAccountInstruction,
   getAccount,
-  Account,
   TOKEN_2022_PROGRAM_ID,
-  AccountLayout
+
 } from "@solana/spl-token";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +26,7 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import { trackAccountClosure, sendGAEvent, getSolscanUrl } from "@/lib/utils/analytics";
+import { getTokenMetadataInfo } from "@/lib/services/token-metadata";
 
 // Define a simple token interface based on the project's structures
 interface TokenItem {
@@ -38,6 +37,7 @@ interface TokenItem {
   balance: string;
   decimals: number;
   logoURI?: string;
+  image?: string;
   type?: string;
   frozen?: boolean;
   mint: string;
@@ -96,14 +96,47 @@ function useUserTokens() {
             const amount = accountData.tokenAmount.uiAmount;
             const decimals = accountData.tokenAmount.decimals;
             
+            // Default token info
+            let name = "Token";
+            let symbol = "TKN";
+            let image = null;
+            
+            // Try to fetch token metadata
+            try {
+              const metadata = await getTokenMetadataInfo(connection, mintAddress);
+              
+              if (metadata) {
+                name = metadata.name || name;
+                symbol = metadata.symbol || symbol;
+                
+                // Try to fetch additional metadata from URI if available
+                if (metadata.uri) {
+                  try {
+                    const response = await fetch(metadata.uri);
+                    if (response.ok) {
+                      const metadataJson = await response.json();
+                      name = metadataJson.name || name;
+                      symbol = metadataJson.symbol || symbol;
+                      image = metadataJson.image || null;
+                    }
+                  } catch (error) {
+                    console.log("Error fetching metadata URI:", error);
+                  }
+                }
+              }
+            } catch (error) {
+              console.log("Error fetching token metadata:", error);
+            }
+            
             // Include accounts with zero balance
             formattedTokens.push({
               id: mintAddress,
               address: pubkey.toBase58(),
-              name: "Token",
-              symbol: "TKN",
+              name: name,
+              symbol: symbol,
               balance: amount.toString(),
               decimals: decimals,
+              image: image,
               type: mintAddress.toLowerCase() === NATIVE_SOL.toLowerCase() ? "sol" : "token",
               frozen: accountData.state === "frozen",
               mint: mintAddress
@@ -150,6 +183,17 @@ export default function CloseAccountForm() {
   // Xác định mạng hiện tại (devnet hoặc mainnet)
   const [currentCluster, setCurrentCluster] = useState<string>('mainnet-beta');
   
+  // Gửi sự kiện khi component được tải
+  useEffect(() => {
+    // Gửi sự kiện khi người dùng mở trang Close Account
+    sendGAEvent('view_close_account_page', {
+      event_category: 'page_view',
+      event_label: 'Close Account Tool View',
+      wallet_connected: !!publicKey,
+      cluster: currentCluster
+    });
+  }, []);
+  
   useEffect(() => {
     if (connection) {
       const endpoint = connection.rpcEndpoint;
@@ -169,6 +213,20 @@ export default function CloseAccountForm() {
   });
 
   const selectedAccounts = form.watch("selectedAccounts");
+  
+  // Gửi sự kiện khi người dùng chọn tài khoản
+  useEffect(() => {
+    if (selectedAccounts.length > 0) {
+      sendGAEvent('select_accounts_to_close', {
+        event_category: 'user_interaction',
+        event_label: 'Selected Accounts To Close',
+        accounts_count: selectedAccounts.length,
+        estimated_rent: estimatedRent.userRent / 1_000_000_000,
+        wallet: publicKey ? `${publicKey.toString().substring(0, 8)}...` : 'unknown',
+        cluster: currentCluster
+      });
+    }
+  }, [selectedAccounts.length]);
 
   // Filter zero-balance accounts
   const zeroBalanceAccounts = useMemo(() => {
@@ -188,8 +246,25 @@ export default function CloseAccountForm() {
         "selectedAccounts",
         zeroBalanceAccounts.map((token: TokenItem) => token.address)
       );
+      
+      // Track when user selects all accounts
+      sendGAEvent('select_all_accounts', {
+        event_category: 'user_interaction',
+        event_label: 'Selected All Accounts',
+        accounts_count: zeroBalanceAccounts.length,
+        wallet: publicKey ? `${publicKey.toString().substring(0, 8)}...` : 'unknown',
+        cluster: currentCluster
+      });
     } else {
       form.setValue("selectedAccounts", []);
+      
+      // Track when user deselects all accounts
+      sendGAEvent('deselect_all_accounts', {
+        event_category: 'user_interaction',
+        event_label: 'Deselected All Accounts',
+        wallet: publicKey ? `${publicKey.toString().substring(0, 8)}...` : 'unknown',
+        cluster: currentCluster
+      });
     }
   };
 
@@ -261,6 +336,16 @@ export default function CloseAccountForm() {
     try {
       setLoading(true);
       setTransactionResult(null);
+
+      // Track when user clicks "Close Accounts" button
+      sendGAEvent('click_close_accounts', {
+        event_category: 'user_interaction',
+        event_label: 'Close Accounts Button Click',
+        accounts_count: values.selectedAccounts.length,
+        estimated_rent: estimatedRent.userRent / 1_000_000_000,
+        wallet: publicKey ? `${publicKey.toString().substring(0, 8)}...` : 'unknown',
+        cluster: currentCluster
+      });
 
       if (!publicKey || !signTransaction || !connection) {
         throw new Error("Please connect your wallet first");
@@ -565,9 +650,9 @@ export default function CloseAccountForm() {
                         />
                         <div className="flex items-center gap-4">
                           <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                            {token.logoURI ? (
+                            {token.image ? (
                               <Image
-                                src={token.logoURI}
+                                src={token.image}
                                 alt={token.name || "Token"}
                                 width={28}
                                 height={28}
