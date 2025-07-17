@@ -9,13 +9,15 @@ import { Form } from "@/components/ui/form";
 import { toast } from "sonner";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Loader2, Wallet, ArrowRight, ExternalLink, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
-import { PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import { PublicKey, Transaction, SystemProgram, clusterApiUrl } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
   createCloseAccountInstruction,
   getAccount,
+  Account,
   TOKEN_2022_PROGRAM_ID,
-  
+  AccountLayout
 } from "@solana/spl-token";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +27,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { trackAccountClosure, sendGAEvent } from "@/lib/utils/analytics";
+import { trackAccountClosure, sendGAEvent, getSolscanUrl } from "@/lib/utils/analytics";
 
 // Define a simple token interface based on the project's structures
 interface TokenItem {
@@ -144,6 +146,22 @@ export default function CloseAccountForm() {
   const { tokens, loading: tokensLoading, refetch } = useUserTokens();
   // Add state for transaction result
   const [transactionResult, setTransactionResult] = useState<TransactionResult | null>(null);
+  
+  // Xác định mạng hiện tại (devnet hoặc mainnet)
+  const [currentCluster, setCurrentCluster] = useState<string>('mainnet-beta');
+  
+  useEffect(() => {
+    if (connection) {
+      const endpoint = connection.rpcEndpoint;
+      if (endpoint.includes('devnet')) {
+        setCurrentCluster('devnet');
+      } else if (endpoint.includes('testnet')) {
+        setCurrentCluster('testnet');
+      } else {
+        setCurrentCluster('mainnet-beta');
+      }
+    }
+  }, [connection]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -193,11 +211,12 @@ export default function CloseAccountForm() {
     sendGAEvent('view_transaction_explorer', {
       event_category: 'user_engagement',
       event_label: 'View Transaction on Solscan',
-      transaction_id: signature
+      transaction_id: signature,
+      cluster: currentCluster
     });
     
-    // Open Solscan in a new tab
-    window.open(`https://solscan.io/tx/${signature}`, "_blank");
+    // Open Solscan in a new tab with correct network
+    window.open(getSolscanUrl(signature, currentCluster), "_blank");
   };
 
   // Estimate rent that will be reclaimed
@@ -341,14 +360,15 @@ export default function CloseAccountForm() {
         accountsClosed: closedAccounts.length,
         solReclaimed: totalRent / 1_000_000_000,
         wallet: publicKey.toBase58(),
-        transactionId: signature
+        transactionId: signature,
+        cluster: currentCluster
       });
 
       toast.success("🎉 Accounts closed successfully!", {
         description: `Closed ${closedAccounts.length} accounts. You received ${(totalRent / 1_000_000_000).toFixed(9)} SOL.`,
         action: {
           label: "View Transaction",
-          onClick: () => window.open(`https://solscan.io/tx/${signature}`, "_blank"),
+          onClick: () => window.open(getSolscanUrl(signature, currentCluster), "_blank"),
         },
       });
       
@@ -366,7 +386,8 @@ export default function CloseAccountForm() {
       // Track error with Analytics
       trackAccountClosure(false, {
         errorMessage: message,
-        wallet: publicKey?.toBase58()
+        wallet: publicKey?.toBase58(),
+        cluster: currentCluster
       });
       
       toast.error(message);
@@ -432,7 +453,7 @@ export default function CloseAccountForm() {
                 
                 {transactionResult.signature && (
                   <Link 
-                    href={`https://solscan.io/tx/${transactionResult.signature}`} 
+                    href={getSolscanUrl(transactionResult.signature, currentCluster)} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     onClick={() => handleViewOnExplorer(transactionResult.signature)}

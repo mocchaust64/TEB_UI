@@ -18,6 +18,16 @@ export const sendGAEvent = (
 };
 
 /**
+ * Get the correct Solscan URL based on network (mainnet/devnet)
+ */
+export const getSolscanUrl = (signature: string, cluster: string = 'mainnet-beta') => {
+  if (cluster === 'devnet') {
+    return `https://solscan.io/tx/${signature}?cluster=devnet`;
+  }
+  return `https://solscan.io/tx/${signature}`;
+};
+
+/**
  * Track account closure events
  */
 export const trackAccountClosure = (
@@ -28,11 +38,12 @@ export const trackAccountClosure = (
     wallet?: string;
     errorMessage?: string;
     transactionId?: string;
+    cluster?: string;
   }
 ) => {
   // Create Solscan URL if transaction ID exists
   const solscanUrl = data.transactionId ? 
-    `https://solscan.io/tx/${data.transactionId}` : 
+    getSolscanUrl(data.transactionId, data.cluster) : 
     undefined;
 
   if (success) {
@@ -45,6 +56,7 @@ export const trackAccountClosure = (
       wallet: data.wallet ? `${data.wallet.substring(0, 8)}...` : 'unknown',
       transaction_id: data.transactionId || 'unknown',
       solscan_url: solscanUrl || 'unknown',
+      cluster: data.cluster || 'mainnet-beta',
       // Send current timestamp for time-based analytics
       timestamp: new Date().toISOString()
     });
@@ -54,6 +66,7 @@ export const trackAccountClosure = (
       event_label: 'Close Account Error',
       error_message: data.errorMessage || 'Unknown error',
       wallet: data.wallet ? `${data.wallet.substring(0, 8)}...` : 'unknown',
+      cluster: data.cluster || 'mainnet-beta',
       // Send current timestamp for time-based analytics
       timestamp: new Date().toISOString()
     });
